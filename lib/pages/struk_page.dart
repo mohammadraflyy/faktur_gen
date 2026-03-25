@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
+import '../main.dart';
+import '../models/catalog_model.dart';
 import '../models/history_model.dart';
 import '../models/settings_model.dart';
 import '../models/struk_model.dart';
 import '../models/reminder_model.dart';
+import '../services/catalog_service.dart';
 import '../services/history_service.dart';
 import '../services/reminder_service.dart';
 import '../services/settings_service.dart';
@@ -34,7 +38,7 @@ class _StrukPageState extends State<StrukPage> {
   SettingsModel _settings = SettingsModel();
 
   final _nomorStrukCtrl = TextEditingController();
-  final List<_ItemCtrls> _itemCtrls = [_ItemCtrls()];
+  final List<_ItemCtrls> _itemCtrls = [];
   final _kasirCtrl = TextEditingController();
   final _diskonCtrl = TextEditingController();
   final _bayarCtrl = TextEditingController();
@@ -103,7 +107,7 @@ class _StrukPageState extends State<StrukPage> {
                     diskon: i.diskon,
                   ))
               .toList();
-          if (_struk.items.isEmpty) _struk.items = [ItemStruk()];
+          if (_struk.items.isEmpty) _struk.items = [];
           for (final c in _itemCtrls) {
             c.dispose();
           }
@@ -153,6 +157,11 @@ class _StrukPageState extends State<StrukPage> {
           _struk.catatan = s.footerStruk;
           _catatanCtrl.text = s.footerStruk;
           _nomorStrukCtrl.text = nomorStruk;
+          _struk.items = [];
+          for (final c in _itemCtrls) {
+            c.dispose();
+          }
+          _itemCtrls.clear();
         }
         _isLoading = false;
       });
@@ -210,27 +219,62 @@ class _StrukPageState extends State<StrukPage> {
     });
   }
 
-  void _addItem() {
+  Future<void> _addItemFromCatalog() async {
+    final items = await CatalogService.loadAll();
+    if (!mounted) return;
+    final selected = await showModalBottomSheet<CatalogItem>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _CatalogPickerSheet(
+        items: items,
+        currencySymbol: _settings.currencySymbol,
+        currencyLocale: _settings.currencyLocale,
+      ),
+    );
+    if (selected == null) return;
     setState(() {
       _isDirty = true;
-      _struk.items.add(ItemStruk());
-      _itemCtrls.add(_ItemCtrls());
+      final item = ItemStruk(
+        nama: selected.nama,
+        kuantitas: 1,
+        satuan: selected.satuan,
+        hargaSatuan: selected.hargaSatuan,
+      );
+      _struk.items.add(item);
+      final c = _ItemCtrls();
+      c.namaCtrl.text = selected.nama;
+      c.deskripsiCtrl.text = selected.deskripsi;
+      c.qtyCtrl.text = '1';
+      c.satuanCtrl.text = selected.satuan;
+      c.hargaCtrl.text =
+          selected.hargaSatuan > 0 ? selected.hargaSatuan.toInt().toString() : '';
+      _itemCtrls.add(c);
     });
   }
 
   void _removeItem(int index) {
-    if (_struk.items.length > 1) {
-      setState(() {
-        _struk.items.removeAt(index);
-        _itemCtrls[index].dispose();
-        _itemCtrls.removeAt(index);
-      });
-    }
+    setState(() {
+      _struk.items.removeAt(index);
+      _itemCtrls[index].dispose();
+      _itemCtrls.removeAt(index);
+    });
   }
 
   Future<void> _generatePdf() async {
     if (!_formKey.currentState!.validate()) return;
     _syncToModel();
+
+    // Validate items exist
+    if (_struk.items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Tambahkan minimal 1 barang dari katalog')),
+      );
+      return;
+    }
     if (!mounted) return;
 
     final struk = _struk;
@@ -343,9 +387,9 @@ class _StrukPageState extends State<StrukPage> {
     ));
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Pengingat berhasil disimpan'),
-          backgroundColor: Color(0xFF065F46),
+        SnackBar(
+          content: const Text('Pengingat berhasil disimpan'),
+          backgroundColor: AppColors.successFor(Theme.of(context).brightness),
         ),
       );
     }
@@ -360,16 +404,14 @@ class _StrukPageState extends State<StrukPage> {
       _bayarCtrl.clear();
       _catatanCtrl.clear();
       _struk.tanggal = DateTime.now();
-      _struk.items = [ItemStruk()];
+      _struk.items = [];
       _struk.metodeBayar = MetodeBayar.tunai;
       _struk.diskon = 0;
       _struk.jumlahBayar = 0;
       for (final c in _itemCtrls) {
         c.dispose();
       }
-      _itemCtrls
-        ..clear()
-        ..add(_ItemCtrls());
+      _itemCtrls.clear();
     });
   }
 
@@ -379,13 +421,16 @@ class _StrukPageState extends State<StrukPage> {
     final width = MediaQuery.sizeOf(context).width;
     final isTablet = width >= 600;
     final hPad = isTablet ? ((width - 680) / 2).clamp(24.0, 9999.0) : 16.0;
-    const green = Color(0xFF065F46);
 
     return Theme(
       data: theme.copyWith(
         colorScheme: theme.colorScheme.copyWith(
-          primary: green,
-          secondary: green,
+          primary: theme.brightness == Brightness.dark
+              ? AppColors.strukGreenSoft
+              : AppColors.strukGreen,
+          secondary: theme.brightness == Brightness.dark
+              ? AppColors.strukGreenSoft
+              : AppColors.strukGreen,
         ),
       ),
       child: Builder(builder: (context) {
@@ -568,17 +613,95 @@ class _StrukPageState extends State<StrukPage> {
   }
 
   Widget _buildItemSection(ThemeData theme) {
-    return _card(
-      theme,
-      title: 'Daftar Barang / Jasa',
-      icon: Icons.shopping_cart,
-      trailing: TextButton.icon(
-        onPressed: _addItem,
-        icon: const Icon(Icons.add, size: 18),
-        label: const Text('Tambah'),
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ...List.generate(_struk.items.length, (i) => _buildItemRow(i, theme)),
+        Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: 10),
+          child: Row(
+            children: [
+              Icon(Icons.shopping_cart, size: 16,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.35)),
+              const SizedBox(width: 6),
+              Text(
+                'Daftar Barang',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                ),
+              ),
+              const Spacer(),
+              if (_struk.items.isNotEmpty)
+                Text(
+                  '${_struk.items.length} item',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
+                  ),
+                ),
+            ],
+          ),
+        ),
+
+        // Item list
+        if (_struk.items.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 32),
+            decoration: BoxDecoration(
+              color: theme.cardColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: theme.dividerTheme.color ?? Colors.grey.shade200,
+              ),
+            ),
+            child: Column(
+              children: [
+                Icon(Icons.shopping_bag_outlined,
+                    size: 36,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.15)),
+                const SizedBox(height: 10),
+                Text(
+                  'Belum ada barang',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Tambahkan dari katalog',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.25),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          ...List.generate(
+              _struk.items.length, (i) => _buildItemRow(i, theme)),
+
+        const SizedBox(height: 12),
+
+        // Add item button
+        SizedBox(
+          width: double.infinity,
+          height: 44,
+          child: OutlinedButton.icon(
+            onPressed: _addItemFromCatalog,
+            icon: const Icon(Icons.add_shopping_cart, size: 18),
+            label: const Text('Tambah Barang dari Katalog'),
+            style: OutlinedButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -587,133 +710,179 @@ class _StrukPageState extends State<StrukPage> {
     final item = _struk.items[index];
     final ctrls = _itemCtrls[index];
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: theme.dividerTheme.color ?? Colors.grey.shade200,
+    return Dismissible(
+      key: ObjectKey(item),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 16),
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: AppColors.errorFor(theme.brightness),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Icon(Icons.delete_outline_rounded,
+            color: Colors.white, size: 20),
+      ),
+      confirmDismiss: (_) async {
+        _removeItem(index);
+        return false; // we already removed it via setState
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: theme.dividerTheme.color ?? Colors.grey.shade200,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Top row: name + price
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.nama,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (ctrls.deskripsiCtrl.text.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          ctrls.deskripsiCtrl.text,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.45),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      const SizedBox(height: 2),
+                      Text(
+                        '${_currency.format(item.hargaSatuan)} / ${item.satuan}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _currency.format(item.subtotal),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 10),
+
+            // Bottom row: qty controls + diskon
+            Row(
+              children: [
+                // Qty stepper
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: theme.dividerTheme.color ?? Colors.grey.shade200,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _qtyBtn(Icons.remove, () {
+                        if (item.kuantitas > 1) {
+                          setState(() {
+                            item.kuantitas--;
+                            ctrls.qtyCtrl.text = _fmtQty(item.kuantitas);
+                          });
+                        }
+                      }, theme),
+                      Container(
+                        constraints: const BoxConstraints(minWidth: 40),
+                        alignment: Alignment.center,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          _fmtQty(item.kuantitas),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      _qtyBtn(Icons.add, () {
+                        setState(() {
+                          item.kuantitas++;
+                          ctrls.qtyCtrl.text = _fmtQty(item.kuantitas);
+                        });
+                      }, theme),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // Diskon inline
+                Expanded(
+                  child: SizedBox(
+                    height: 36,
+                    child: TextFormField(
+                      controller: ctrls.diskonCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Diskon',
+                        prefixText: _settings.currencySymbol,
+                        hintText: '0',
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 8),
+                        isDense: true,
+                      ),
+                      style: const TextStyle(fontSize: 13),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly
+                      ],
+                      onChanged: (v) {
+                        setState(() {
+                          item.diskon = double.tryParse(v) ?? 0;
+                        });
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                'Item ${index + 1}',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-                ),
-              ),
-              const Spacer(),
-              if (_struk.items.length > 1)
-                GestureDetector(
-                  onTap: () => _removeItem(index),
-                  child: Icon(Icons.close_rounded,
-                      size: 18,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.3)),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: ctrls.namaCtrl,
-            decoration: const InputDecoration(labelText: 'Nama Barang / Jasa'),
-            onChanged: (v) => item.nama = v,
-            validator: (v) =>
-                (v == null || v.isEmpty) ? 'Wajib diisi' : null,
-          ),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: ctrls.deskripsiCtrl,
-            decoration: const InputDecoration(
-                labelText: 'Deskripsi (opsional)', hintText: 'Detail tambahan...'),
-            onChanged: (v) => item.deskripsi = v,
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: ctrls.qtyCtrl,
-                  decoration: const InputDecoration(labelText: 'Qty'),
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))
-                  ],
-                  onChanged: (v) {
-                    setState(() {
-                      item.kuantitas = double.tryParse(v) ?? item.kuantitas;
-                    });
-                  },
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Wajib diisi' : null,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextFormField(
-                  controller: ctrls.satuanCtrl,
-                  decoration: const InputDecoration(labelText: 'Satuan'),
-                  onChanged: (v) => item.satuan = v,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 2,
-                child: TextFormField(
-                  controller: ctrls.hargaCtrl,
-                  decoration: InputDecoration(
-                    labelText: 'Harga Satuan',
-                    prefixText: _settings.currencySymbol,
-                  ),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  onChanged: (v) {
-                    setState(() {
-                      item.hargaSatuan = double.tryParse(v) ?? 0;
-                    });
-                  },
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Wajib diisi' : null,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: ctrls.diskonCtrl,
-            decoration: InputDecoration(
-              labelText: 'Diskon Item (${_settings.currencySymbol.trim()})',
-              prefixText: _settings.currencySymbol,
-              hintText: '0',
-            ),
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            onChanged: (v) {
-              setState(() {
-                item.diskon = double.tryParse(v) ?? 0;
-              });
-            },
-          ),
-          const SizedBox(height: 6),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              'Subtotal: ${_currency.format(item.subtotal)}',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: theme.colorScheme.primary,
-              ),
-            ),
-          ),
-        ],
+    );
+  }
+
+  Widget _qtyBtn(IconData icon, VoidCallback onTap, ThemeData theme) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.all(6),
+        child: Icon(icon, size: 16,
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
       ),
     );
   }
@@ -826,7 +995,9 @@ class _StrukPageState extends State<StrukPage> {
     final style = TextStyle(
       fontWeight: bold ? FontWeight.bold : FontWeight.normal,
       fontSize: bold ? 16 : 14,
-      color: isDiskon ? Colors.red : const Color(0xFF065F46),
+      color: isDiskon
+          ? AppColors.errorFor(theme.brightness)
+          : theme.colorScheme.primary,
     );
     final display = isDiskon
         ? '- ${_currency.format(value.abs())}'
@@ -940,5 +1111,298 @@ class _ItemCtrls {
     satuanCtrl.dispose();
     hargaCtrl.dispose();
     diskonCtrl.dispose();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Catalog Picker Bottom Sheet (with create-new ability)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _CatalogPickerSheet extends StatefulWidget {
+  final List<CatalogItem> items;
+  final String currencySymbol;
+  final String currencyLocale;
+  const _CatalogPickerSheet({
+    required this.items,
+    this.currencySymbol = 'Rp ',
+    this.currencyLocale = 'id_ID',
+  });
+
+  @override
+  State<_CatalogPickerSheet> createState() => _CatalogPickerSheetState();
+}
+
+class _CatalogPickerSheetState extends State<_CatalogPickerSheet> {
+  late List<CatalogItem> _all;
+  late List<CatalogItem> _filtered;
+  final _searchCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _all = widget.items;
+    _filtered = _all;
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _filter(String q) {
+    setState(() {
+      if (q.isEmpty) {
+        _filtered = _all;
+      } else {
+        final lq = q.toLowerCase();
+        _filtered =
+            _all.where((c) => c.nama.toLowerCase().contains(lq)).toList();
+      }
+    });
+  }
+
+  Future<void> _refresh() async {
+    final items = await CatalogService.loadAll();
+    setState(() {
+      _all = items;
+      _filter(_searchCtrl.text);
+    });
+  }
+
+  Future<void> _addNew() async {
+    final namaCtrl = TextEditingController();
+    final deskripsiCtrl = TextEditingController();
+    final satuanCtrl = TextEditingController(text: 'pcs');
+    final hargaCtrl = TextEditingController();
+
+    final result = await showDialog<CatalogItem>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Tambah Barang Baru'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: namaCtrl,
+                decoration: const InputDecoration(labelText: 'Nama Barang'),
+                autofocus: true,
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: deskripsiCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Deskripsi (opsional)'),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: satuanCtrl,
+                      decoration: const InputDecoration(labelText: 'Satuan'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: hargaCtrl,
+                      decoration: const InputDecoration(labelText: 'Harga'),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          TextButton(
+            onPressed: () {
+              if (namaCtrl.text.trim().isEmpty) return;
+              final item = CatalogItem(
+                id: DateTime.now().millisecondsSinceEpoch.toString(),
+                nama: namaCtrl.text.trim(),
+                deskripsi: deskripsiCtrl.text.trim(),
+                satuan: satuanCtrl.text.trim(),
+                hargaSatuan: double.tryParse(hargaCtrl.text) ?? 0,
+              );
+              Navigator.pop(ctx, item);
+            },
+            child: const Text('Simpan & Pilih'),
+          ),
+        ],
+      ),
+    );
+    namaCtrl.dispose();
+    deskripsiCtrl.dispose();
+    satuanCtrl.dispose();
+    hargaCtrl.dispose();
+
+    if (result != null) {
+      await CatalogService.save(result);
+      if (mounted) Navigator.pop(context, result);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DraggableScrollableSheet(
+      initialChildSize: 0.55,
+      maxChildSize: 0.85,
+      minChildSize: 0.3,
+      expand: false,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: theme.cardColor,
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                child: Column(
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Icon(Icons.inventory_2_outlined,
+                            color: theme.colorScheme.primary, size: 20),
+                        const SizedBox(width: 8),
+                        Text('Pilih Barang',
+                            style: GoogleFonts.inter(
+                                fontSize: 16, fontWeight: FontWeight.w600)),
+                        const Spacer(),
+                        TextButton.icon(
+                          onPressed: _addNew,
+                          icon: const Icon(Icons.add, size: 16),
+                          label: const Text('Buat Baru'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _searchCtrl,
+                      onChanged: _filter,
+                      decoration: const InputDecoration(
+                        hintText: 'Cari barang...',
+                        prefixIcon: Icon(Icons.search, size: 18),
+                      ),
+                      style: GoogleFonts.inter(fontSize: 13),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: _filtered.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.inventory_2_outlined,
+                                size: 48,
+                                color: theme.colorScheme.onSurface
+                                    .withValues(alpha: 0.15)),
+                            const SizedBox(height: 12),
+                            Text(
+                              _all.isEmpty
+                                  ? 'Belum ada barang'
+                                  : 'Tidak ditemukan',
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                color: theme.colorScheme.onSurface
+                                    .withValues(alpha: 0.4),
+                              ),
+                            ),
+                            if (_all.isEmpty) ...[
+                              const SizedBox(height: 6),
+                              Text(
+                                'Tap "Buat Baru" untuk menambah barang',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: theme.colorScheme.onSurface
+                                      .withValues(alpha: 0.3),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: scrollController,
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+                        itemCount: _filtered.length,
+                        itemBuilder: (_, i) {
+                          final item = _filtered[i];
+                          final currency = NumberFormat.currency(
+                            locale: widget.currencyLocale,
+                            symbol: widget.currencySymbol,
+                            decimalDigits: 0,
+                          );
+                          return ListTile(
+                            leading: Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primary
+                                    .withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(Icons.shopping_bag_outlined,
+                                  size: 18, color: theme.colorScheme.primary),
+                            ),
+                            title: Text(item.nama,
+                                style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500)),
+                            subtitle: Text(
+                              '${item.satuan} — ${currency.format(item.hargaSatuan)}',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: theme.colorScheme.onSurface
+                                    .withValues(alpha: 0.45),
+                              ),
+                            ),
+                            trailing: IconButton(
+                              icon: Icon(Icons.delete_outline,
+                                  size: 16,
+                                  color: theme.colorScheme.onSurface
+                                      .withValues(alpha: 0.3)),
+                              onPressed: () async {
+                                await CatalogService.delete(item.id);
+                                await _refresh();
+                              },
+                            ),
+                            onTap: () => Navigator.pop(context, item),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }

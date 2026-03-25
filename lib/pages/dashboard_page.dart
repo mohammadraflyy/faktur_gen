@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import '../main.dart';
 import '../models/history_model.dart';
 import '../models/reminder_model.dart';
 import '../models/settings_model.dart';
@@ -110,7 +111,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   value: _currency.format(totalThisMonth),
                   sub: '${invoiceCount + strukCount} dokumen',
                   icon: Icons.trending_up_rounded,
-                  color: const Color(0xFF2563EB),
+                  color: theme.colorScheme.primary,
                 ),
               ),
               const SizedBox(width: 12),
@@ -121,7 +122,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   value: _currency.format(totalLastMonth),
                   sub: '${lastMonth.length} dokumen',
                   icon: Icons.history_rounded,
-                  color: const Color(0xFF6B7280),
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
                 ),
               ),
             ],
@@ -136,7 +137,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   value: '$invoiceCount',
                   sub: 'bulan ini',
                   icon: Icons.receipt_long_outlined,
-                  color: const Color(0xFF2563EB),
+                  color: theme.colorScheme.primary,
                 ),
               ),
               const SizedBox(width: 12),
@@ -147,7 +148,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   value: '$strukCount',
                   sub: 'bulan ini',
                   icon: Icons.receipt_outlined,
-                  color: const Color(0xFF059669),
+                  color: theme.colorScheme.secondary,
                 ),
               ),
             ],
@@ -160,7 +161,7 @@ class _DashboardPageState extends State<DashboardPage> {
               value: _currency.format(unpaidTotal),
               sub: '$unpaidCount invoice',
               icon: Icons.warning_amber_rounded,
-              color: const Color(0xFFD97706),
+              color: AppColors.warningFor(theme.brightness),
             ),
           ],
 
@@ -282,7 +283,7 @@ class _DashboardPageState extends State<DashboardPage> {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: isOverdue
-              ? Colors.red.shade300
+              ? AppColors.errorFor(theme.brightness).withValues(alpha: 0.4)
               : (theme.dividerTheme.color ?? Colors.grey.shade200),
         ),
       ),
@@ -292,15 +293,18 @@ class _DashboardPageState extends State<DashboardPage> {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: isOverdue
-                  ? Colors.red.withValues(alpha: 0.08)
-                  : Colors.orange.withValues(alpha: 0.08),
+              color: (isOverdue
+                      ? AppColors.errorFor(theme.brightness)
+                      : AppColors.warningFor(theme.brightness))
+                  .withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
               Icons.notifications_active_outlined,
               size: 16,
-              color: isOverdue ? Colors.red : Colors.orange,
+              color: isOverdue
+                  ? AppColors.errorFor(theme.brightness)
+                  : AppColors.warningFor(theme.brightness),
             ),
           ),
           const SizedBox(width: 10),
@@ -324,7 +328,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   style: GoogleFonts.inter(
                     fontSize: 11,
                     color: isOverdue
-                        ? Colors.red
+                        ? AppColors.errorFor(theme.brightness)
                         : theme.colorScheme.onSurface.withValues(alpha: 0.5),
                   ),
                 ),
@@ -335,7 +339,8 @@ class _DashboardPageState extends State<DashboardPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.1),
+                color: AppColors.errorFor(theme.brightness)
+                    .withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
@@ -343,7 +348,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 style: GoogleFonts.inter(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
-                    color: Colors.red),
+                    color: AppColors.errorFor(theme.brightness)),
               ),
             ),
         ],

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'pages/home_page.dart';
+import 'pages/splash_page.dart';
 import 'services/notification_service.dart';
 import 'services/reminder_service.dart';
 import 'services/theme_service.dart';
@@ -15,6 +15,44 @@ void main() async {
   await NotificationService.requestPermission();
   await ReminderService.rescheduleNotifications();
   runApp(const MyApp());
+}
+
+/// Centralized semantic color constants for the app.
+/// Use these instead of hard-coding color values in individual pages.
+class AppColors {
+  AppColors._();
+
+  // Brand colors
+  static const invoiceBlue = Color(0xFF2563EB);
+  static const strukGreen = Color(0xFF059669);
+
+  // Light variants (for dark mode)
+  static const invoiceBlueSoft = Color(0xFF60A5FA);
+  static const strukGreenSoft = Color(0xFF34D399);
+
+  // Status colors (light mode)
+  static const error = Color(0xFFDC2626);
+  static const warning = Color(0xFFD97706);
+
+  // Status colors (dark mode — softer to avoid harsh contrast)
+  static const errorSoft = Color(0xFFF87171);
+  static const warningSoft = Color(0xFFFBBF24);
+
+  // Success (for snackbar, badges)
+  static const success = Color(0xFF059669);
+  static const successSoft = Color(0xFF34D399);
+
+  /// Get the appropriate error color for the current brightness.
+  static Color errorFor(Brightness brightness) =>
+      brightness == Brightness.dark ? errorSoft : error;
+
+  /// Get the appropriate warning color for the current brightness.
+  static Color warningFor(Brightness brightness) =>
+      brightness == Brightness.dark ? warningSoft : warning;
+
+  /// Get the appropriate success color for the current brightness.
+  static Color successFor(Brightness brightness) =>
+      brightness == Brightness.dark ? successSoft : success;
 }
 
 class MyApp extends StatelessWidget {
@@ -32,12 +70,12 @@ class MyApp extends StatelessWidget {
           isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
         );
         return MaterialApp(
-          title: 'Faktur Gen',
+          title: 'Faktura',
           debugShowCheckedModeBanner: false,
           themeMode: themeMode,
           theme: _light(),
           darkTheme: _dark(),
-          home: const HomePage(),
+          home: const SplashWrapper(),
         );
       },
     );

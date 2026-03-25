@@ -38,9 +38,9 @@ class BackupService {
     final json = const JsonEncoder.withIndent('  ')
         .convert({'version': 1, 'data': data});
     final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/backup_faktur_gen.json');
+    final file = File('${dir.path}/backup_faktura.json');
     await file.writeAsString(json);
-    await Share.shareXFiles([XFile(file.path)], subject: 'Backup Faktur Gen');
+    await Share.shareXFiles([XFile(file.path)], subject: 'Backup Faktura');
   }
 
   static Future<bool> import() async {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
+import '../main.dart';
 import '../models/history_model.dart';
 import '../models/faktur_model.dart';
 import '../models/settings_model.dart';
@@ -291,24 +292,28 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Widget _buildEmptyState() {
+    final theme = Theme.of(context);
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.history, size: 64, color: Colors.grey[300]),
+          Icon(Icons.history, size: 64,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.15)),
           const SizedBox(height: 16),
           Text(
             'Belum ada riwayat',
             style: GoogleFonts.inter(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: Colors.grey[400],
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
             ),
           ),
           const SizedBox(height: 4),
           Text(
             'Dokumen yang dibuat akan muncul di sini',
-            style: GoogleFonts.inter(fontSize: 13, color: Colors.grey[400]),
+            style: GoogleFonts.inter(
+                fontSize: 13,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.3)),
           ),
         ],
       ),
@@ -343,7 +348,7 @@ class _HistoryPageState extends State<HistoryPage> {
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: const Color(0xFF94A3B8),
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                   letterSpacing: 0.5,
                 ),
               ),
@@ -358,8 +363,13 @@ class _HistoryPageState extends State<HistoryPage> {
   Widget _buildEntryCard(HistoryEntry entry) {
     final theme = Theme.of(context);
     final isInvoice = entry.docType == DocType.invoice;
-    final color =
-        isInvoice ? const Color(0xFF2563EB) : const Color(0xFF059669);
+    final color = isInvoice
+        ? (theme.brightness == Brightness.dark
+            ? AppColors.invoiceBlueSoft
+            : AppColors.invoiceBlue)
+        : (theme.brightness == Brightness.dark
+            ? AppColors.strukGreenSoft
+            : AppColors.strukGreen);
     final icon =
         isInvoice ? Icons.receipt_long_outlined : Icons.receipt_outlined;
     final typeLabel = isInvoice ? 'INV' : 'STR';
@@ -373,7 +383,7 @@ class _HistoryPageState extends State<HistoryPage> {
         padding: const EdgeInsets.only(right: 20),
         margin: const EdgeInsets.only(bottom: 6),
         decoration: BoxDecoration(
-          color: const Color(0xFFEF4444),
+          color: AppColors.errorFor(theme.brightness),
           borderRadius: BorderRadius.circular(12),
         ),
         child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 20),
@@ -459,7 +469,7 @@ class _HistoryPageState extends State<HistoryPage> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 5, vertical: 1),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF059669)
+                                color: AppColors.successFor(Theme.of(context).brightness)
                                     .withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(4),
                               ),
@@ -468,7 +478,7 @@ class _HistoryPageState extends State<HistoryPage> {
                                 style: GoogleFonts.inter(
                                   fontSize: 9,
                                   fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF059669),
+                                  color: AppColors.successFor(Theme.of(context).brightness),
                                 ),
                               ),
                             ),
@@ -542,11 +552,13 @@ class _DetailSheetState extends State<_DetailSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final isInvoice = entry.docType == DocType.invoice;
-    final color =
-        isInvoice ? const Color(0xFF1E40AF) : const Color(0xFF065F46);
-    final bgColor =
-        isInvoice ? const Color(0xFFEFF6FF) : const Color(0xFFECFDF5);
+    final color = isInvoice
+        ? (isDark ? AppColors.invoiceBlueSoft : AppColors.invoiceBlue)
+        : (isDark ? AppColors.strukGreenSoft : AppColors.strukGreen);
+    final bgColor = color.withValues(alpha: isDark ? 0.1 : 0.06);
     final typeLabel = isInvoice ? 'Invoice' : 'Struk';
     final dateFmt = DateFormat('dd MMMM yyyy', 'id_ID');
     final dateTimeFmt = DateFormat('dd MMM yyyy, HH:mm', 'id_ID');
@@ -716,12 +728,12 @@ class _DetailSheetState extends State<_DetailSheet> {
                         horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
                       color: entry.paymentStatus == PaymentStatus.paid
-                          ? const Color(0xFF059669).withValues(alpha: 0.08)
+                          ? AppColors.successFor(Theme.of(context).brightness).withValues(alpha: 0.08)
                           : const Color(0xFFD97706).withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                         color: entry.paymentStatus == PaymentStatus.paid
-                            ? const Color(0xFF059669).withValues(alpha: 0.2)
+                            ? AppColors.successFor(Theme.of(context).brightness).withValues(alpha: 0.2)
                             : const Color(0xFFD97706).withValues(alpha: 0.2),
                       ),
                     ),
@@ -734,7 +746,7 @@ class _DetailSheetState extends State<_DetailSheet> {
                               : Icons.pending_rounded,
                           size: 18,
                           color: entry.paymentStatus == PaymentStatus.paid
-                              ? const Color(0xFF059669)
+                              ? AppColors.successFor(Theme.of(context).brightness)
                               : const Color(0xFFD97706),
                         ),
                         const SizedBox(width: 8),
@@ -746,7 +758,7 @@ class _DetailSheetState extends State<_DetailSheet> {
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: entry.paymentStatus == PaymentStatus.paid
-                                ? const Color(0xFF059669)
+                                ? AppColors.successFor(Theme.of(context).brightness)
                                 : const Color(0xFFD97706),
                           ),
                         ),

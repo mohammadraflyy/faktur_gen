@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../main.dart';
 import '../models/contact_model.dart';
 import '../models/reminder_model.dart';
 import '../services/contact_service.dart';
@@ -206,7 +207,7 @@ class _ReminderPageState extends State<ReminderPage>
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -457,11 +458,14 @@ class _ReminderPageState extends State<ReminderPage>
     final isOverdue = r.isOverdue;
     final isDue = r.isDue && !isOverdue;
 
+    final errColor = AppColors.errorFor(theme.brightness);
+    final warnColor = AppColors.warningFor(theme.brightness);
+
     Color borderColor;
     if (isOverdue) {
-      borderColor = Colors.red.shade300;
+      borderColor = errColor.withValues(alpha: 0.4);
     } else if (isDue) {
-      borderColor = Colors.orange.shade300;
+      borderColor = warnColor.withValues(alpha: 0.4);
     } else {
       borderColor = theme.dividerTheme.color ?? Colors.grey.shade200;
     }
@@ -485,20 +489,21 @@ class _ReminderPageState extends State<ReminderPage>
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: isOverdue
-                      ? Colors.red.withValues(alpha: 0.08)
-                      : isDue
-                          ? Colors.orange.withValues(alpha: 0.08)
-                          : theme.colorScheme.primary.withValues(alpha: 0.08),
+                  color: (isOverdue
+                          ? errColor
+                          : isDue
+                              ? warnColor
+                              : theme.colorScheme.primary)
+                      .withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   Icons.notifications_active_outlined,
                   size: 18,
                   color: isOverdue
-                      ? Colors.red
+                      ? errColor
                       : isDue
-                          ? Colors.orange
+                          ? warnColor
                           : theme.colorScheme.primary,
                 ),
               ),
@@ -605,7 +610,7 @@ class _ReminderPageState extends State<ReminderPage>
               Icon(Icons.calendar_today,
                   size: 13,
                   color: isOverdue
-                      ? Colors.red
+                      ? errColor
                       : theme.colorScheme.onSurface.withValues(alpha: 0.4)),
               const SizedBox(width: 6),
               Text(
@@ -614,7 +619,7 @@ class _ReminderPageState extends State<ReminderPage>
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: isOverdue
-                      ? Colors.red
+                      ? errColor
                       : theme.colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
               ),
@@ -624,7 +629,7 @@ class _ReminderPageState extends State<ReminderPage>
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: 0.1),
+                    color: errColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -632,7 +637,7 @@ class _ReminderPageState extends State<ReminderPage>
                     style: GoogleFonts.inter(
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
-                      color: Colors.red,
+                      color: errColor,
                     ),
                   ),
                 ),
@@ -642,7 +647,7 @@ class _ReminderPageState extends State<ReminderPage>
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.1),
+                    color: warnColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -650,7 +655,7 @@ class _ReminderPageState extends State<ReminderPage>
                     style: GoogleFonts.inter(
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
-                      color: Colors.orange,
+                      color: warnColor,
                     ),
                   ),
                 ),
@@ -959,7 +964,7 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey[300],
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -1272,7 +1277,7 @@ class _ContactManagerSheetState extends State<_ContactManagerSheet> {
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: Colors.grey[300],
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -1492,7 +1497,7 @@ class _ContactFormSheetState extends State<_ContactFormSheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey[300],
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),

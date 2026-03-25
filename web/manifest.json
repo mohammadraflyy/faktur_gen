@@ -1,11 +1,11 @@
 {
-    "name": "faktur_gen",
-    "short_name": "faktur_gen",
+    "name": "Faktura",
+    "short_name": "Faktura",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#F8F9FB",
+    "theme_color": "#2563EB",
+    "description": "Invoice & Struk Profesional",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

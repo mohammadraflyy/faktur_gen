@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../main.dart';
 import '../models/settings_model.dart';
 import '../services/backup_service.dart';
 import '../services/settings_service.dart';
@@ -98,7 +99,7 @@ class _SettingsPageState extends State<SettingsPage> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -174,9 +175,9 @@ class _SettingsPageState extends State<SettingsPage> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Pengaturan berhasil disimpan'),
-          backgroundColor: Color(0xFF065F46),
+        SnackBar(
+          content: const Text('Pengaturan berhasil disimpan'),
+          backgroundColor: AppColors.successFor(Theme.of(context).brightness),
         ),
       );
       Navigator.pop(context, true);
@@ -802,9 +803,9 @@ class _SettingsPageState extends State<SettingsPage> {
       if (mounted) {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Backup berhasil di-import! Restart aplikasi.'),
-              backgroundColor: Color(0xFF065F46),
+            SnackBar(
+              content: const Text('Backup berhasil di-import! Restart aplikasi.'),
+              backgroundColor: AppColors.successFor(Theme.of(context).brightness),
             ),
           );
           await _load();

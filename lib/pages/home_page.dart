@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import '../main.dart';
 import '../models/reminder_model.dart';
 import '../models/settings_model.dart';
 import '../services/reminder_service.dart';
@@ -125,7 +126,7 @@ class _HomePageState extends State<HomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Faktur Gen',
+                        'Faktura',
                         style: GoogleFonts.inter(
                           fontSize: 26,
                           fontWeight: FontWeight.w700,
@@ -134,7 +135,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Buat invoice & struk dengan mudah',
+                        'Invoice & struk profesional',
                         style: GoogleFonts.inter(
                           fontSize: 14,
                           color: theme.colorScheme.onSurface
@@ -192,7 +193,7 @@ class _HomePageState extends State<HomePage> {
               title: 'Invoice',
               subtitle: 'Faktur profesional dengan PPN 11%',
               icon: Icons.receipt_long_outlined,
-              color: const Color(0xFF2563EB),
+              color: theme.colorScheme.primary,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const FakturPage()),
@@ -203,7 +204,7 @@ class _HomePageState extends State<HomePage> {
               title: 'Struk',
               subtitle: 'Struk kasir untuk barang atau jasa',
               icon: Icons.receipt_outlined,
-              color: const Color(0xFF059669),
+              color: theme.colorScheme.secondary,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const StrukPage()),
@@ -235,8 +236,8 @@ class _HomePageState extends State<HomePage> {
             top: 2,
             child: Container(
               padding: const EdgeInsets.all(4),
-              decoration: const BoxDecoration(
-                color: Colors.red,
+              decoration: BoxDecoration(
+                color: AppColors.errorFor(Theme.of(context).brightness),
                 shape: BoxShape.circle,
               ),
               child: Text(
@@ -479,7 +480,7 @@ class _DueRemindersSheet extends StatelessWidget {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey[300],
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -490,11 +491,12 @@ class _DueRemindersSheet extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.1),
+                    color: AppColors.warningFor(theme.brightness)
+                        .withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.notifications_active,
-                      color: Colors.orange, size: 20),
+                  child: Icon(Icons.notifications_active,
+                      color: AppColors.warningFor(theme.brightness), size: 20),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -541,8 +543,10 @@ class _DueRemindersSheet extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isOverdue
-                            ? Colors.red.shade300
-                            : Colors.orange.shade300,
+                            ? AppColors.errorFor(theme.brightness)
+                                .withValues(alpha: 0.4)
+                            : AppColors.warningFor(theme.brightness)
+                                .withValues(alpha: 0.4),
                       ),
                     ),
                     child: Column(
@@ -577,20 +581,21 @@ class _DueRemindersSheet extends StatelessWidget {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                color: isOverdue
-                                    ? Colors.red.withValues(alpha: 0.1)
-                                    : Colors.orange.withValues(alpha: 0.1),
+                                color: (isOverdue
+                                        ? AppColors.errorFor(theme.brightness)
+                                        : AppColors.warningFor(
+                                            theme.brightness))
+                                    .withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
-                                isOverdue
-                                    ? 'Terlewat'
-                                    : 'Hari ini',
+                                isOverdue ? 'Terlewat' : 'Hari ini',
                                 style: GoogleFonts.inter(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w600,
-                                  color:
-                                      isOverdue ? Colors.red : Colors.orange,
+                                  color: isOverdue
+                                      ? AppColors.errorFor(theme.brightness)
+                                      : AppColors.warningFor(theme.brightness),
                                 ),
                               ),
                             ),
@@ -634,8 +639,8 @@ class _DueRemindersSheet extends StatelessWidget {
                                     style: OutlinedButton.styleFrom(
                                       foregroundColor:
                                           r.docType == ReminderDocType.struk
-                                              ? const Color(0xFF059669)
-                                              : const Color(0xFF2563EB),
+                                              ? theme.colorScheme.secondary
+                                              : theme.colorScheme.primary,
                                     ),
                                   ),
                                 ),

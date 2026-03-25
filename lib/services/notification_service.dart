@@ -8,8 +8,17 @@ class NotificationService {
   static FlutterLocalNotificationsPlugin? _plugin;
   static bool _initialized = false;
 
-  /// Jumlah notifikasi ke depan untuk pengingat berulang
+  /// Jumlah notifikasi ke depan untuk pengingat berulang (bulanan)
   static const _maxFutureSchedules = 12;
+
+  /// Jumlah alarm pengulangan setiap 5 menit setelah waktu jatuh tempo
+  static const _maxFollowUpAlarms = 12; // 12 x 5 menit = 1 jam
+
+  /// Interval pengulangan alarm (menit)
+  static const _followUpIntervalMinutes = 5;
+
+  /// Jumlah ID per satu jadwal (1 utama + follow-ups)
+  static const _idsPerSchedule = _maxFollowUpAlarms + 1;
 
   static bool get _supported => !kIsWeb;
 
@@ -46,11 +55,9 @@ class NotificationService {
         AndroidFlutterLocalNotificationsPlugin>();
     if (android == null) return false;
 
-    // Request POST_NOTIFICATIONS permission (Android 13+)
     final granted = await android.requestNotificationsPermission();
     debugPrint('[NotifService] POST_NOTIFICATIONS granted: $granted');
 
-    // Request exact alarm permission (Android 12+)
     final exactAlarm = await android.requestExactAlarmsPermission();
     debugPrint('[NotifService] Exact alarm granted: $exactAlarm');
 
@@ -80,11 +87,17 @@ class NotificationService {
       if (reminder.isRepeating) {
         await _scheduleRecurring(reminder);
       } else {
-        await _scheduleSingle(
-          reminder.notificationId,
-          reminder.reminderDate,
+        final baseDate = tz.TZDateTime(
+          tz.local,
+          reminder.reminderDate.year,
+          reminder.reminderDate.month,
+          reminder.reminderDate.day,
           reminder.reminderHour,
           reminder.reminderMinute,
+        );
+        await _scheduleWithFollowUps(
+          reminder.notificationId,
+          baseDate,
           reminder.serviceName,
           reminder.contactName,
         );
@@ -110,63 +123,69 @@ class NotificationService {
       );
 
       if (scheduledDate.isAfter(now)) {
-        // Unique ID per occurrence: base ID + offset
-        final notifId =
-            (reminder.notificationId + i) % 2147483647;
-        await _scheduleNotification(
-          notifId,
+        final baseId =
+            (reminder.notificationId + i * _idsPerSchedule) % 2147483647;
+        await _scheduleWithFollowUps(
+          baseId,
           scheduledDate,
           reminder.serviceName,
           reminder.contactName,
         );
       }
 
-      // Maju ke bulan berikutnya
       date = DateTime(date.year, date.month + months, date.day);
     }
   }
 
-  static Future<void> _scheduleSingle(
-    int notifId,
-    DateTime date,
-    int hour,
-    int minute,
+  /// Jadwalkan notifikasi utama + alarm pengulangan setiap 5 menit
+  static Future<void> _scheduleWithFollowUps(
+    int baseId,
+    tz.TZDateTime scheduledDate,
     String serviceName,
     String contactName,
   ) async {
-    final scheduledDate = tz.TZDateTime(
-      tz.local,
-      date.year,
-      date.month,
-      date.day,
-      hour,
-      minute,
-    );
-
     final now = tz.TZDateTime.now(tz.local);
-    if (scheduledDate.isBefore(now)) {
-      debugPrint('[NotifService] Skipping past date: $scheduledDate');
-      return;
+
+    // Notifikasi utama
+    if (scheduledDate.isAfter(now)) {
+      await _scheduleNotification(
+        baseId,
+        scheduledDate,
+        'Pengingat: $serviceName',
+        '$contactName — saatnya $serviceName',
+      );
     }
 
-    debugPrint('[NotifService] Scheduling for: $scheduledDate (now: $now)');
-    await _scheduleNotification(
-        notifId, scheduledDate, serviceName, contactName);
+    // Alarm pengulangan setiap 5 menit setelah waktu utama
+    for (var j = 1; j <= _maxFollowUpAlarms; j++) {
+      final followUpDate = scheduledDate.add(
+        Duration(minutes: _followUpIntervalMinutes * j),
+      );
+      if (followUpDate.isAfter(now)) {
+        final followUpId = (baseId + j) % 2147483647;
+        await _scheduleNotification(
+          followUpId,
+          followUpDate,
+          '⏰ Pengingat: $serviceName',
+          '$contactName — pengingat ke-$j, segera tindak lanjuti!',
+        );
+      }
+    }
   }
 
   static Future<void> _scheduleNotification(
     int notifId,
     tz.TZDateTime scheduledDate,
-    String serviceName,
-    String contactName,
+    String title,
+    String body,
   ) async {
     const details = NotificationDetails(android: _androidDetails);
 
     try {
       await _plugin!.zonedSchedule(
         notifId,
-        'Pengingat: $serviceName',
-        '$contactName — saatnya $serviceName',
+        title,
+        body,
         scheduledDate,
         details,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -174,15 +193,14 @@ class NotificationService {
             UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: null,
       );
-      debugPrint('[NotifService] Scheduled notif #$notifId at $scheduledDate');
+      debugPrint('[NotifService] Scheduled #$notifId at $scheduledDate');
     } catch (e) {
       debugPrint('[NotifService] exactAllowWhileIdle failed: $e');
-      // Fallback ke inexact jika exact alarm tidak diizinkan
       try {
         await _plugin!.zonedSchedule(
           notifId,
-          'Pengingat: $serviceName',
-          '$contactName — saatnya $serviceName',
+          title,
+          body,
           scheduledDate,
           details,
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
@@ -190,7 +208,7 @@ class NotificationService {
               UILocalNotificationDateInterpretation.absoluteTime,
           matchDateTimeComponents: null,
         );
-        debugPrint('[NotifService] Fallback inexact scheduled #$notifId');
+        debugPrint('[NotifService] Fallback inexact #$notifId');
       } catch (e2) {
         debugPrint('[NotifService] Fallback also failed: $e2');
       }
@@ -199,8 +217,9 @@ class NotificationService {
 
   static Future<void> cancelReminder(ReminderModel reminder) async {
     if (!_supported || _plugin == null) return;
-    // Cancel semua notifikasi recurring (base ID + 0..11)
-    for (var i = 0; i < _maxFutureSchedules; i++) {
+    // Cancel semua: recurring schedules + follow-up alarms
+    final totalIds = _maxFutureSchedules * _idsPerSchedule;
+    for (var i = 0; i < totalIds; i++) {
       await _plugin!
           .cancel((reminder.notificationId + i) % 2147483647);
     }

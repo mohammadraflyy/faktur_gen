@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import '../main.dart';
 import '../models/contact_model.dart';
 import '../models/faktur_model.dart';
 import '../models/history_model.dart';
@@ -378,9 +379,9 @@ class _FakturPageState extends State<FakturPage> {
     ));
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Pengingat berhasil disimpan'),
-          backgroundColor: Color(0xFF065F46),
+        SnackBar(
+          content: const Text('Pengingat berhasil disimpan'),
+          backgroundColor: AppColors.successFor(Theme.of(context).brightness),
         ),
       );
     }
@@ -473,7 +474,7 @@ class _FakturPageState extends State<FakturPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Template "$name" tersimpan'),
-          backgroundColor: const Color(0xFF065F46),
+          backgroundColor: AppColors.successFor(Theme.of(context).brightness),
         ),
       );
     }
