@@ -9,12 +9,32 @@ import 'services/theme_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initializeDateFormatting('id_ID', null);
-  await ThemeService.load();
-  await NotificationService.init();
-  await NotificationService.requestPermission();
-  await ReminderService.rescheduleNotifications();
+
+  // Hanya inisialisasi ringan sebelum runApp
+  try {
+    await initializeDateFormatting('id_ID', null);
+    await ThemeService.load();
+  } catch (e) {
+    debugPrint('[main] Pre-init error (non-fatal): $e');
+  }
+
   runApp(const MyApp());
+
+  // Inisialisasi berat dijalankan SETELAH runApp agar UI tidak stuck
+  try {
+    await NotificationService.init();
+    // requestPermission tidak perlu blocking — jalankan tapi jangan await lama
+    NotificationService.requestPermission().timeout(
+      const Duration(seconds: 5),
+      onTimeout: () {
+        debugPrint('[main] Permission request timed out');
+        return false;
+      },
+    );
+    await ReminderService.rescheduleNotifications();
+  } catch (e) {
+    debugPrint('[main] Post-init error (non-fatal): $e');
+  }
 }
 
 /// Centralized semantic color constants for the app.

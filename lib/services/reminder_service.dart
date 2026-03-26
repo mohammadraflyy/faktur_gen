@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/reminder_model.dart';
 import 'notification_service.dart';
@@ -74,25 +75,31 @@ class ReminderService {
 
   /// Auto-advance recurring reminders yang terlewat, lalu reschedule semua
   static Future<void> rescheduleNotifications() async {
-    final list = await loadAll();
-    final today = DateTime(
-        DateTime.now().year, DateTime.now().month, DateTime.now().day);
-    bool changed = false;
+    try {
+      final list = await loadAll();
+      final today = DateTime(
+          DateTime.now().year, DateTime.now().month, DateTime.now().day);
+      bool changed = false;
 
-    for (final r in list) {
-      if (r.status == ReminderStatus.pending &&
-          r.isRepeating &&
-          r.reminderDate.isBefore(today)) {
-        // Maju terus sampai tanggal >= hari ini
-        while (r.reminderDate.isBefore(today)) {
-          r.advanceToNext();
+      for (final r in list) {
+        if (r.status == ReminderStatus.pending &&
+            r.isRepeating &&
+            r.reminderDate.isBefore(today)) {
+          // Maju terus sampai tanggal >= hari ini, max 120 iterasi sebagai safety net
+          var iterations = 0;
+          while (r.reminderDate.isBefore(today) && iterations < 120) {
+            r.advanceToNext();
+            iterations++;
+          }
+          changed = true;
         }
-        changed = true;
       }
-    }
 
-    if (changed) await _persist(list);
-    await NotificationService.rescheduleAll(list);
+      if (changed) await _persist(list);
+      await NotificationService.rescheduleAll(list);
+    } catch (e) {
+      debugPrint('[ReminderService] rescheduleNotifications error: $e');
+    }
   }
 
   static Future<void> _persist(List<ReminderModel> reminders) async {
