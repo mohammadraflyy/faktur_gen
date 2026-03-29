@@ -3,6 +3,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
+import '../models/doc_template_config.dart';
 import '../models/faktur_model.dart';
 import '../models/settings_model.dart';
 
@@ -27,10 +28,24 @@ class PdfService {
   static final _dateFormat = DateFormat('dd MMMM yyyy', 'id_ID');
   static final _numFormat = NumberFormat('#,##0.##', 'id_ID');
 
-  static const _blue = PdfColor.fromInt(0xFF1565C0);
-  static const _bluLight = PdfColor.fromInt(0xFFE3F2FD);
   static const _textDark = PdfColor.fromInt(0xFF1A1A1A);
   static const _textGrey = PdfColor.fromInt(0xFF757575);
+
+  // Template-aware colors
+  static PdfColor _primary(DocTemplateConfig? tpl) =>
+      PdfColor.fromInt(tpl?.primaryColorValue ?? 0xFF1565C0);
+  static PdfColor _primaryLight(DocTemplateConfig? tpl) {
+    final c = tpl?.primaryColorValue ?? 0xFF1565C0;
+    // Lighten: mix with white at ~90%
+    final r = ((c >> 16) & 0xFF);
+    final g = ((c >> 8) & 0xFF);
+    final b = (c & 0xFF);
+    return PdfColor(
+      (r + (255 - r) * 0.88) / 255,
+      (g + (255 - g) * 0.88) / 255,
+      (b + (255 - b) * 0.88) / 255,
+    );
+  }
 
   static String _filename(FakturModel f) =>
       'Invoice_${f.nomorFaktur.replaceAll('/', '-')}.pdf';
@@ -42,13 +57,15 @@ class PdfService {
     Uint8List? signatureBytes,
     bool isPaid = false,
     bool showQr = false,
+    DocTemplateConfig? templateConfig,
   }) async =>
       _buildDocument(faktur,
               format: format,
               logoBytes: logoBytes,
               signatureBytes: signatureBytes,
               isPaid: isPaid,
-              showQr: showQr)
+              showQr: showQr,
+              tpl: templateConfig)
           .save();
 
   static Future<void> print(FakturModel faktur, {Uint8List? logoBytes}) async {
@@ -75,7 +92,13 @@ class PdfService {
     Uint8List? signatureBytes,
     bool isPaid = false,
     bool showQr = false,
+    DocTemplateConfig? tpl,
   }) {
+    final showLogo = tpl?.showLogo ?? true;
+    final showSig = tpl?.showSignature ?? true;
+    final showBank = tpl?.showBankInfo ?? true;
+    final showNpwp = tpl?.showNpwp ?? true;
+
     final pdf = pw.Document();
     pdf.addPage(
       pw.MultiPage(
@@ -84,23 +107,23 @@ class PdfService {
         build: (ctx) {
           final cur = _currencyOf(faktur);
           return [
-          _header(faktur, logoBytes),
+          _header(faktur, showLogo ? logoBytes : null, tpl),
           pw.SizedBox(height: 20),
-          _billTo(faktur),
+          _billTo(faktur, tpl, showNpwp: showNpwp),
           pw.SizedBox(height: 20),
-          _itemTable(faktur, cur),
+          _itemTable(faktur, cur, tpl),
           pw.SizedBox(height: 12),
-          _totals(faktur, cur),
+          _totals(faktur, cur, tpl),
           if (isPaid) ...[
             pw.SizedBox(height: 12),
             _paidStamp(),
           ],
           pw.SizedBox(height: 24),
-          if (faktur.bankAccounts.isNotEmpty) ...[
+          if (showBank && faktur.bankAccounts.isNotEmpty) ...[
             pw.Row(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Expanded(child: _paymentInfo(faktur.bankAccounts)),
+                pw.Expanded(child: _paymentInfo(faktur.bankAccounts, tpl)),
                 if (showQr && faktur.bankAccounts.isNotEmpty) ...[
                   pw.SizedBox(width: 16),
                   _qrCode(faktur.bankAccounts.first),
@@ -109,7 +132,7 @@ class PdfService {
             ),
             pw.SizedBox(height: 24),
           ],
-          _footer(faktur, signatureBytes: signatureBytes),
+          _footer(faktur, signatureBytes: showSig ? signatureBytes : null, tpl: tpl),
         ];
         },
       ),
@@ -156,58 +179,82 @@ class PdfService {
   // Header: logo + company (kiri) | INVOICE + nomor/tanggal (kanan)
   // ─────────────────────────────────────────────────────────────────────────
 
-  static pw.Widget _header(FakturModel f, Uint8List? logoBytes) {
+  static pw.Widget _header(FakturModel f, Uint8List? logoBytes, DocTemplateConfig? tpl) {
+    final color = _primary(tpl);
+    final style = tpl?.invoiceTemplate ?? InvoiceTemplate.modern;
+    final isMinimal = style == InvoiceTemplate.minimal;
+    final isClassic = style == InvoiceTemplate.classic;
+    final logoCenter = tpl?.logoCenter ?? false;
+
+    final companyInfo = pw.Column(
+      crossAxisAlignment: logoCenter
+          ? pw.CrossAxisAlignment.center
+          : pw.CrossAxisAlignment.start,
+      children: [
+        if (logoBytes != null) ...[
+          pw.Image(pw.MemoryImage(logoBytes), width: 60, height: 60),
+          pw.SizedBox(height: 8),
+        ],
+        pw.Text(
+          f.namaPenjual.isEmpty ? 'Nama Perusahaan' : f.namaPenjual,
+          style: pw.TextStyle(
+              fontSize: 14,
+              fontWeight: pw.FontWeight.bold,
+              color: _textDark),
+        ),
+        if (f.alamatPenjual.isNotEmpty)
+          pw.Text(f.alamatPenjual,
+              style: const pw.TextStyle(fontSize: 9, color: _textGrey)),
+        if (f.teleponPenjual.isNotEmpty)
+          pw.Text(f.teleponPenjual,
+              style: const pw.TextStyle(fontSize: 9, color: _textGrey)),
+        if (f.emailPenjual.isNotEmpty)
+          pw.Text(f.emailPenjual,
+              style: const pw.TextStyle(fontSize: 9, color: _textGrey)),
+        if (f.npwpPenjual.isNotEmpty)
+          pw.Text('NPWP: ${f.npwpPenjual}',
+              style: const pw.TextStyle(fontSize: 9, color: _textGrey)),
+      ],
+    );
+
+    final invoiceTitle = isMinimal
+        ? pw.Text('INVOICE',
+            style: pw.TextStyle(
+                fontSize: 22,
+                fontWeight: pw.FontWeight.bold,
+                color: _textDark,
+                letterSpacing: 2))
+        : isClassic
+            ? pw.Container(
+                padding: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: color, width: 2),
+                ),
+                child: pw.Text('INVOICE',
+                    style: pw.TextStyle(
+                        fontSize: 22,
+                        fontWeight: pw.FontWeight.bold,
+                        color: color)),
+              )
+            : pw.Container(
+                padding: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                decoration: pw.BoxDecoration(color: color),
+                child: pw.Text('INVOICE',
+                    style: pw.TextStyle(
+                        fontSize: 22,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.white)),
+              );
+
     return pw.Row(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        // Kiri: logo + info perusahaan
-        pw.Expanded(
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              if (logoBytes != null) ...[
-                pw.Image(pw.MemoryImage(logoBytes), width: 60, height: 60),
-                pw.SizedBox(height: 8),
-              ],
-              pw.Text(
-                f.namaPenjual.isEmpty ? 'Nama Perusahaan' : f.namaPenjual,
-                style: pw.TextStyle(
-                    fontSize: 14,
-                    fontWeight: pw.FontWeight.bold,
-                    color: _textDark),
-              ),
-              if (f.alamatPenjual.isNotEmpty)
-                pw.Text(f.alamatPenjual,
-                    style: const pw.TextStyle(fontSize: 9, color: _textGrey)),
-              if (f.teleponPenjual.isNotEmpty)
-                pw.Text(f.teleponPenjual,
-                    style: const pw.TextStyle(fontSize: 9, color: _textGrey)),
-              if (f.emailPenjual.isNotEmpty)
-                pw.Text(f.emailPenjual,
-                    style: const pw.TextStyle(fontSize: 9, color: _textGrey)),
-              if (f.npwpPenjual.isNotEmpty)
-                pw.Text('NPWP: ${f.npwpPenjual}',
-                    style: const pw.TextStyle(fontSize: 9, color: _textGrey)),
-            ],
-          ),
-        ),
+        pw.Expanded(child: companyInfo),
         pw.SizedBox(width: 24),
-        // Kanan: judul INVOICE + detail
         pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.end,
           children: [
-            pw.Container(
-              padding:
-                  const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              decoration: const pw.BoxDecoration(color: _blue),
-              child: pw.Text(
-                'INVOICE',
-                style: pw.TextStyle(
-                    fontSize: 22,
-                    fontWeight: pw.FontWeight.bold,
-                    color: PdfColors.white),
-              ),
-            ),
+            invoiceTitle,
             pw.SizedBox(height: 10),
             _detailRow('No. Invoice', f.nomorFaktur.isEmpty ? '-' : f.nomorFaktur),
             pw.SizedBox(height: 4),
@@ -241,13 +288,24 @@ class PdfService {
   // Bill To
   // ─────────────────────────────────────────────────────────────────────────
 
-  static pw.Widget _billTo(FakturModel f) {
+  static pw.Widget _billTo(FakturModel f, DocTemplateConfig? tpl, {bool showNpwp = true}) {
+    final color = _primary(tpl);
+    final light = _primaryLight(tpl);
+    final style = tpl?.invoiceTemplate ?? InvoiceTemplate.modern;
+    final isMinimal = style == InvoiceTemplate.minimal;
+
     return pw.Container(
       padding: const pw.EdgeInsets.all(12),
-      decoration: const pw.BoxDecoration(
-        color: _bluLight,
-        border: pw.Border(left: pw.BorderSide(color: _blue, width: 3)),
-      ),
+      decoration: isMinimal
+          ? pw.BoxDecoration(
+              border: pw.Border(
+                  top: const pw.BorderSide(color: PdfColors.grey300, width: 0.5),
+                  bottom: const pw.BorderSide(color: PdfColors.grey300, width: 0.5)),
+            )
+          : pw.BoxDecoration(
+              color: light,
+              border: pw.Border(left: pw.BorderSide(color: color, width: 3)),
+            ),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
@@ -255,7 +313,7 @@ class PdfService {
               style: pw.TextStyle(
                   fontSize: 8,
                   fontWeight: pw.FontWeight.bold,
-                  color: _blue,
+                  color: isMinimal ? _textGrey : color,
                   letterSpacing: 1)),
           pw.SizedBox(height: 6),
           pw.Text(
@@ -265,7 +323,7 @@ class PdfService {
                 fontWeight: pw.FontWeight.bold,
                 color: _textDark),
           ),
-          if (f.npwpPembeli.isNotEmpty)
+          if (showNpwp && f.npwpPembeli.isNotEmpty)
             pw.Text('NPWP: ${f.npwpPembeli}',
                 style: const pw.TextStyle(fontSize: 9, color: _textGrey)),
           if (f.alamatPembeli.isNotEmpty)
@@ -283,7 +341,12 @@ class PdfService {
   // Items table
   // ─────────────────────────────────────────────────────────────────────────
 
-  static pw.Widget _itemTable(FakturModel f, NumberFormat cur) {
+  static pw.Widget _itemTable(FakturModel f, NumberFormat cur, DocTemplateConfig? tpl) {
+    final color = _primary(tpl);
+    final style = tpl?.invoiceTemplate ?? InvoiceTemplate.modern;
+    final isMinimal = style == InvoiceTemplate.minimal;
+    final isClassic = style == InvoiceTemplate.classic;
+
     const headers = ['No', 'Deskripsi', 'Qty', 'Satuan', 'Harga Satuan', 'Jumlah'];
     const widths = {
       0: pw.FlexColumnWidth(0.5),
@@ -294,16 +357,28 @@ class PdfService {
       5: pw.FlexColumnWidth(1.5),
     };
 
+    final headerBg = isMinimal
+        ? PdfColors.white
+        : isClassic
+            ? PdfColors.grey200
+            : color;
+    final headerTextColor = isMinimal
+        ? _textDark
+        : isClassic
+            ? _textDark
+            : PdfColors.white;
+
     return pw.Table(
       columnWidths: widths,
       border: pw.TableBorder(
-        bottom: const pw.BorderSide(color: _blue, width: 0.5),
+        bottom: pw.BorderSide(color: isMinimal ? PdfColors.grey400 : color, width: 0.5),
         horizontalInside: pw.BorderSide(color: PdfColors.grey300, width: 0.5),
+        top: isClassic ? const pw.BorderSide(color: PdfColors.grey400, width: 1) : pw.BorderSide.none,
       ),
       children: [
         // Header row
         pw.TableRow(
-          decoration: const pw.BoxDecoration(color: _blue),
+          decoration: pw.BoxDecoration(color: headerBg),
           children: headers.map((h) {
             final isRight = ['Qty', 'Harga Satuan', 'Jumlah'].contains(h);
             return pw.Padding(
@@ -312,7 +387,7 @@ class PdfService {
                   style: pw.TextStyle(
                       fontSize: 9,
                       fontWeight: pw.FontWeight.bold,
-                      color: PdfColors.white),
+                      color: headerTextColor),
                   textAlign:
                       isRight ? pw.TextAlign.right : pw.TextAlign.left),
             );
@@ -374,7 +449,8 @@ class PdfService {
   // Totals (kanan bawah)
   // ─────────────────────────────────────────────────────────────────────────
 
-  static pw.Widget _totals(FakturModel f, NumberFormat cur) {
+  static pw.Widget _totals(FakturModel f, NumberFormat cur, DocTemplateConfig? tpl) {
+    final color = _primary(tpl);
     return pw.Align(
       alignment: pw.Alignment.centerRight,
       child: pw.SizedBox(
@@ -384,8 +460,8 @@ class PdfService {
             _totalLine('DPP', f.totalDpp, cur),
             pw.Divider(color: PdfColors.grey300, height: 8),
             _totalLine('PPN (${f.taxRate % 1 == 0 ? f.taxRate.toInt() : f.taxRate}%)', f.totalPpn, cur),
-            pw.Divider(color: _blue, height: 10, thickness: 1),
-            _totalLine('TOTAL', f.totalTagihan, cur, bold: true, large: true),
+            pw.Divider(color: color, height: 10, thickness: 1),
+            _totalLine('TOTAL', f.totalTagihan, cur, bold: true, large: true, color: color),
           ],
         ),
       ),
@@ -393,7 +469,7 @@ class PdfService {
   }
 
   static pw.Widget _totalLine(String label, double value, NumberFormat cur,
-      {bool bold = false, bool large = false}) {
+      {bool bold = false, bool large = false, PdfColor? color}) {
     final sz = large ? 11.0 : 9.0;
     final fw = bold ? pw.FontWeight.bold : pw.FontWeight.normal;
     return pw.Row(
@@ -405,7 +481,7 @@ class PdfService {
             style: pw.TextStyle(
                 fontSize: sz,
                 fontWeight: fw,
-                color: bold ? _blue : _textDark)),
+                color: bold ? (color ?? _textDark) : _textDark)),
       ],
     );
   }
@@ -414,11 +490,12 @@ class PdfService {
   // Payment info: bank account(s)
   // ─────────────────────────────────────────────────────────────────────────
 
-  static pw.Widget _paymentInfo(List<BankAccount> banks) {
+  static pw.Widget _paymentInfo(List<BankAccount> banks, DocTemplateConfig? tpl) {
+    final color = _primary(tpl);
     return pw.Container(
       padding: const pw.EdgeInsets.all(12),
       decoration: pw.BoxDecoration(
-        border: pw.Border.all(color: _blue, width: 0.5),
+        border: pw.Border.all(color: color, width: 0.5),
         borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
       ),
       child: pw.Column(
@@ -429,7 +506,7 @@ class PdfService {
             style: pw.TextStyle(
               fontSize: 8,
               fontWeight: pw.FontWeight.bold,
-              color: _blue,
+              color: color,
               letterSpacing: 1,
             ),
           ),
@@ -471,7 +548,7 @@ class PdfService {
   // Footer: catatan (kiri) + tanda tangan (kanan)
   // ─────────────────────────────────────────────────────────────────────────
 
-  static pw.Widget _footer(FakturModel f, {Uint8List? signatureBytes}) {
+  static pw.Widget _footer(FakturModel f, {Uint8List? signatureBytes, DocTemplateConfig? tpl}) {
     return pw.Row(
       crossAxisAlignment: pw.CrossAxisAlignment.end,
       children: [

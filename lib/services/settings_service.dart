@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/doc_template_config.dart';
 import '../models/settings_model.dart';
 
 class SettingsService {
@@ -19,6 +20,7 @@ class SettingsService {
   static const _kCurrency = 's_currency';
   static const _kInvPrefix = 's_inv_prefix';
   static const _kStrPrefix = 's_str_prefix';
+  static const _kTemplateConfig = 's_template_config';
 
   static const _kStrukDate = 's_struk_date';
   static const _kStrukCounter = 's_struk_counter';
@@ -73,6 +75,19 @@ class SettingsService {
       banks = decoded.map((e) => BankAccount.fromMap(e)).toList();
     }
 
+    DocTemplateConfig? templateConfig;
+    try {
+      final tplJson = prefs.getString(_kTemplateConfig);
+      if (tplJson != null && tplJson.isNotEmpty) {
+        final decoded = jsonDecode(tplJson);
+        if (decoded is Map<String, dynamic>) {
+          templateConfig = DocTemplateConfig.fromMap(decoded);
+        }
+      }
+    } catch (_) {
+      // Corrupt or missing template config — use default
+    }
+
     return SettingsModel(
       namaToko: prefs.getString(_kNama) ?? '',
       alamat: prefs.getString(_kAlamat) ?? '',
@@ -89,6 +104,7 @@ class SettingsService {
       currency: prefs.getString(_kCurrency) ?? 'IDR',
       invoicePrefix: prefs.getString(_kInvPrefix) ?? 'INV',
       strukPrefix: prefs.getString(_kStrPrefix) ?? 'STR',
+      templateConfig: templateConfig,
     );
   }
 
@@ -107,6 +123,8 @@ class SettingsService {
     await prefs.setString(_kCurrency, s.currency);
     await prefs.setString(_kInvPrefix, s.invoicePrefix);
     await prefs.setString(_kStrPrefix, s.strukPrefix);
+    await prefs.setString(
+        _kTemplateConfig, jsonEncode(s.templateConfig.toMap()));
     if (s.logoBytes != null) {
       await prefs.setString(_kLogo, base64Encode(s.logoBytes!));
     } else {

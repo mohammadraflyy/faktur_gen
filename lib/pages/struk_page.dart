@@ -255,12 +255,44 @@ class _StrukPageState extends State<StrukPage> {
     });
   }
 
+  void _reorderItem(int oldIndex, int newIndex) {
+    setState(() {
+      if (newIndex > oldIndex) newIndex--;
+      final item = _struk.items.removeAt(oldIndex);
+      _struk.items.insert(newIndex, item);
+      final ctrl = _itemCtrls.removeAt(oldIndex);
+      _itemCtrls.insert(newIndex, ctrl);
+      _isDirty = true;
+    });
+  }
+
   void _removeItem(int index) {
+    if (_struk.items.isEmpty) return;
+    final removedItem = _struk.items[index];
+    final removedCtrl = _itemCtrls[index];
     setState(() {
       _struk.items.removeAt(index);
-      _itemCtrls[index].dispose();
       _itemCtrls.removeAt(index);
     });
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '"${removedItem.nama.isNotEmpty ? removedItem.nama : 'Item ${index + 1}'}" dihapus',
+        ),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () {
+            setState(() {
+              final insertAt = index.clamp(0, _struk.items.length);
+              _struk.items.insert(insertAt, removedItem);
+              _itemCtrls.insert(insertAt, removedCtrl);
+            });
+          },
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
   Future<void> _generatePdf() async {
@@ -321,7 +353,8 @@ class _StrukPageState extends State<StrukPage> {
               StrukPdfService.buildBytes(struk, format,
                   logoBytes: logoBytes,
                   currencySymbol: _settings.currencySymbol,
-                  currencyLocale: _settings.currencyLocale),
+                  currencyLocale: _settings.currencyLocale,
+                  templateConfig: _settings.templateConfig),
           initialPageFormat: struklFormat,
           canChangePageFormat: false,
         ),
@@ -477,7 +510,7 @@ class _StrukPageState extends State<StrukPage> {
           body: Form(
             key: _formKey,
             child: ListView(
-              padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 40),
+              padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 24),
               children: [
                 _buildTokoBanner(t),
                 const SizedBox(height: 24),
@@ -488,10 +521,13 @@ class _StrukPageState extends State<StrukPage> {
                 _buildPembayaran(t, isTablet: isTablet),
                 const SizedBox(height: 24),
                 _buildRingkasan(t),
-                const SizedBox(height: 32),
-                _buildGenerateButton(t, isTablet: isTablet),
-                const SizedBox(height: 24),
               ],
+            ),
+          ),
+          bottomNavigationBar: SafeArea(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(hPad, 10, hPad, 8),
+              child: _buildGenerateButton(t, isTablet: isTablet),
             ),
           ),
         ),
@@ -781,7 +817,34 @@ class _StrukPageState extends State<StrukPage> {
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
+                if (_struk.items.length > 1) ...[
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (index > 0)
+                        GestureDetector(
+                          onTap: () => _reorderItem(index, index - 1),
+                          child: Padding(
+                            padding: const EdgeInsets.all(2),
+                            child: Icon(Icons.arrow_upward_rounded,
+                                size: 14,
+                                color: theme.colorScheme.onSurface.withValues(alpha: 0.25)),
+                          ),
+                        ),
+                      if (index < _struk.items.length - 1)
+                        GestureDetector(
+                          onTap: () => _reorderItem(index, index + 2),
+                          child: Padding(
+                            padding: const EdgeInsets.all(2),
+                            child: Icon(Icons.arrow_downward_rounded,
+                                size: 14,
+                                color: theme.colorScheme.onSurface.withValues(alpha: 0.25)),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(width: 4),
+                ],
                 Text(
                   _currency.format(item.subtotal),
                   style: TextStyle(

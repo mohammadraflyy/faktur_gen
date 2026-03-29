@@ -3,6 +3,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
+import '../models/doc_template_config.dart';
 import '../models/struk_model.dart';
 
 class StrukPdfService {
@@ -32,13 +33,16 @@ class StrukPdfService {
     Uint8List? logoBytes,
     String currencySymbol = 'Rp ',
     String currencyLocale = 'id_ID',
+    DocTemplateConfig? templateConfig,
   }) async {
     _initCurrency(currencySymbol: currencySymbol, currencyLocale: currencyLocale);
-    return _buildDocument(struk, logoBytes: logoBytes).save();
+    return _buildDocument(struk, logoBytes: logoBytes, tpl: templateConfig).save();
   }
 
   static pw.Document _buildDocument(StrukModel struk,
-      {Uint8List? logoBytes}) {
+      {Uint8List? logoBytes, DocTemplateConfig? tpl}) {
+    final isCompact = (tpl?.strukTemplate ?? StrukTemplate.standard) == StrukTemplate.compact;
+    final showLogo = tpl?.showLogo ?? true;
     final pdf = pw.Document();
     final pageFormat = PdfPageFormat(
       _receiptWidth,
@@ -52,7 +56,7 @@ class StrukPdfService {
           crossAxisAlignment: pw.CrossAxisAlignment.stretch,
           mainAxisSize: pw.MainAxisSize.min,
           children: [
-            _buildHeader(struk, logoBytes: logoBytes),
+            _buildHeader(struk, logoBytes: (showLogo && !isCompact) ? logoBytes : null, compact: isCompact),
             _dashedLine(),
             _buildInfoStruk(struk),
             _dashedLine(),
@@ -99,7 +103,21 @@ class StrukPdfService {
     await Printing.sharePdf(bytes: bytes, filename: _filename(struk));
   }
 
-  static pw.Widget _buildHeader(StrukModel struk, {Uint8List? logoBytes}) {
+  static pw.Widget _buildHeader(StrukModel struk, {Uint8List? logoBytes, bool compact = false}) {
+    if (compact) {
+      // Compact: just store name, no logo/address
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
+        children: [
+          pw.Text(
+            struk.namaToko.isEmpty ? 'NAMA TOKO' : struk.namaToko.toUpperCase(),
+            style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+            textAlign: pw.TextAlign.center,
+          ),
+          pw.SizedBox(height: 2),
+        ],
+      );
+    }
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.center,
       children: [

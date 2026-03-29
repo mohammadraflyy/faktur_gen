@@ -15,6 +15,7 @@ import '../services/struk_pdf_service.dart';
 import '../pages/pdf_preview_page.dart';
 import '../pages/faktur_page.dart';
 import '../pages/struk_page.dart';
+import '../services/locale_service.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -30,6 +31,7 @@ class _HistoryPageState extends State<HistoryPage> {
   final _searchCtrl = TextEditingController();
   String _searchQuery = '';
   DocType? _typeFilter;
+  PaymentStatus? _paymentFilter;
 
   SettingsModel _settings = SettingsModel();
 
@@ -52,17 +54,22 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Future<void> _load() async {
-    final results = await Future.wait([
-      HistoryService.load(),
-      SettingsService.load(),
-    ]);
-    if (mounted) {
-      setState(() {
-        _entries = results[0] as List<HistoryEntry>;
-        _settings = results[1] as SettingsModel;
-        _applyFilter();
-        _isLoading = false;
-      });
+    try {
+      final results = await Future.wait([
+        HistoryService.load(),
+        SettingsService.load(),
+      ]);
+      if (mounted) {
+        setState(() {
+          _entries = results[0] as List<HistoryEntry>;
+          _settings = results[1] as SettingsModel;
+          _applyFilter();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+      debugPrint('[History] load error: $e');
     }
   }
 
@@ -70,6 +77,13 @@ class _HistoryPageState extends State<HistoryPage> {
     var list = _entries;
     if (_typeFilter != null) {
       list = list.where((e) => e.docType == _typeFilter).toList();
+    }
+    if (_paymentFilter != null) {
+      list = list
+          .where((e) =>
+              e.docType == DocType.invoice &&
+              e.paymentStatus == _paymentFilter)
+          .toList();
     }
     if (_searchQuery.isNotEmpty) {
       final q = _searchQuery.toLowerCase();
@@ -103,39 +117,36 @@ class _HistoryPageState extends State<HistoryPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal export: $e')),
+          SnackBar(content: Text('${tr('common.export_fail')}: $e')),
         );
       }
     }
   }
 
-  Future<void> _confirmClearAll() async {
-    if (_entries.isEmpty) return;
-    final confirmed = await showDialog<bool>(
+  Future<bool> _confirmDeleteEntry(HistoryEntry entry) async {
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Hapus Semua History?'),
-        content: const Text('Semua riwayat pembuatan dokumen akan dihapus.'),
+        title: Text(tr('history.delete_title')),
+        content: Text('Hapus "${entry.nomorDokumen}"?'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Batal')),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(tr('common.cancel')),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Hapus', style: TextStyle(color: Colors.red)),
+            child: Text(tr('common.delete'), style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
-    if (confirmed == true) {
-      await HistoryService.clearAll();
-      _load();
+    if (confirm == true) {
+      await HistoryService.delete(entry.id);
+      await _load();
+      return true;
     }
-  }
-
-  Future<void> _deleteEntry(HistoryEntry entry) async {
-    await HistoryService.delete(entry.id);
-    await _load();
+    return false;
   }
 
   void _duplicateEntry(HistoryEntry entry) {
@@ -179,30 +190,39 @@ class _HistoryPageState extends State<HistoryPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Riwayat'),
+        title: Text(tr('history.title')),
         actions: [
-          if (_entries.isNotEmpty) ...[
+          if (_entries.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.file_download_outlined, size: 20),
-              tooltip: 'Export CSV',
+              tooltip: tr('history.export_csv'),
               onPressed: _exportCsv,
             ),
-            IconButton(
-              icon: const Icon(Icons.delete_sweep_outlined, size: 20),
-              tooltip: 'Hapus Semua',
-              onPressed: _confirmClearAll,
-            ),
-          ],
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _entries.isEmpty
-              ? _buildEmptyState()
+              ? RefreshIndicator(
+                  onRefresh: _load,
+                  child: ListView(
+                    children: [
+                      SizedBox(
+                        height: MediaQuery.sizeOf(context).height * 0.6,
+                        child: _buildEmptyState(),
+                      ),
+                    ],
+                  ),
+                )
               : Column(
                   children: [
                     _buildSearchAndFilter(),
-                    Expanded(child: _buildList()),
+                    Expanded(
+                      child: RefreshIndicator(
+                        onRefresh: _load,
+                        child: _buildList(),
+                      ),
+                    ),
                   ],
                 ),
     );
@@ -218,7 +238,7 @@ class _HistoryPageState extends State<HistoryPage> {
             controller: _searchCtrl,
             onChanged: _onSearch,
             decoration: InputDecoration(
-              hintText: 'Cari dokumen...',
+              hintText: tr('history.search'),
               prefixIcon: Icon(Icons.search, size: 18,
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.4)),
               suffixIcon: _searchQuery.isNotEmpty
@@ -234,46 +254,76 @@ class _HistoryPageState extends State<HistoryPage> {
             style: GoogleFonts.inter(fontSize: 13),
           ),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              _filterChip('Semua', _typeFilter == null, () => _onTypeFilter(null)),
-              const SizedBox(width: 6),
-              _filterChip(
-                  'Invoice', _typeFilter == DocType.invoice, () => _onTypeFilter(DocType.invoice)),
-              const SizedBox(width: 6),
-              _filterChip(
-                  'Struk', _typeFilter == DocType.struk, () => _onTypeFilter(DocType.struk)),
-              const Spacer(),
-              Text(
-                '${_filtered.length}',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _filterChip(tr('history.all'), _typeFilter == null && _paymentFilter == null, () {
+                  setState(() { _typeFilter = null; _paymentFilter = null; _applyFilter(); });
+                }),
+                const SizedBox(width: 6),
+                _filterChip(tr('history.invoice'), _typeFilter == DocType.invoice, () => _onTypeFilter(DocType.invoice)),
+                const SizedBox(width: 6),
+                _filterChip(tr('history.receipt'), _typeFilter == DocType.struk, () => _onTypeFilter(DocType.struk)),
+                const SizedBox(width: 6),
+                _filterChip(
+                  tr('history.unpaid'),
+                  _paymentFilter == PaymentStatus.unpaid,
+                  () {
+                    setState(() {
+                      _paymentFilter = _paymentFilter == PaymentStatus.unpaid ? null : PaymentStatus.unpaid;
+                      if (_paymentFilter != null) _typeFilter = null;
+                      _applyFilter();
+                    });
+                  },
+                  color: AppColors.warningFor(theme.brightness),
                 ),
-              ),
-            ],
+                const SizedBox(width: 6),
+                _filterChip(
+                  tr('history.paid'),
+                  _paymentFilter == PaymentStatus.paid,
+                  () {
+                    setState(() {
+                      _paymentFilter = _paymentFilter == PaymentStatus.paid ? null : PaymentStatus.paid;
+                      if (_paymentFilter != null) _typeFilter = null;
+                      _applyFilter();
+                    });
+                  },
+                  color: AppColors.successFor(theme.brightness),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  '${_filtered.length}',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _filterChip(String label, bool selected, VoidCallback onTap) {
+  Widget _filterChip(String label, bool selected, VoidCallback onTap, {Color? color}) {
     final theme = Theme.of(context);
+    final accent = color ?? theme.colorScheme.primary;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: selected
-              ? theme.colorScheme.primary.withValues(alpha: 0.1)
+              ? accent.withValues(alpha: 0.1)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: selected
-                ? theme.colorScheme.primary.withValues(alpha: 0.3)
+                ? accent.withValues(alpha: 0.3)
                 : theme.colorScheme.onSurface.withValues(alpha: 0.1),
           ),
         ),
@@ -283,7 +333,7 @@ class _HistoryPageState extends State<HistoryPage> {
             fontSize: 12,
             fontWeight: FontWeight.w500,
             color: selected
-                ? theme.colorScheme.primary
+                ? accent
                 : theme.colorScheme.onSurface.withValues(alpha: 0.5),
           ),
         ),
@@ -301,7 +351,7 @@ class _HistoryPageState extends State<HistoryPage> {
               color: theme.colorScheme.onSurface.withValues(alpha: 0.15)),
           const SizedBox(height: 16),
           Text(
-            'Belum ada riwayat',
+            tr('history.empty'),
             style: GoogleFonts.inter(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -310,7 +360,7 @@ class _HistoryPageState extends State<HistoryPage> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Dokumen yang dibuat akan muncul di sini',
+            tr('history.empty_sub'),
             style: GoogleFonts.inter(
                 fontSize: 13,
                 color: theme.colorScheme.onSurface.withValues(alpha: 0.3)),
@@ -346,8 +396,8 @@ class _HistoryPageState extends State<HistoryPage> {
               child: Text(
                 dateLabel,
                 style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                   letterSpacing: 0.5,
                 ),
@@ -380,15 +430,16 @@ class _HistoryPageState extends State<HistoryPage> {
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
+        padding: const EdgeInsets.only(right: 24),
         margin: const EdgeInsets.only(bottom: 6),
         decoration: BoxDecoration(
-          color: AppColors.errorFor(theme.brightness),
+          color: AppColors.errorFor(theme.brightness).withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 20),
+        child: Icon(Icons.delete_outline_rounded,
+            color: AppColors.errorFor(theme.brightness), size: 22),
       ),
-      onDismissed: (_) => _deleteEntry(entry),
+      confirmDismiss: (_) => _confirmDeleteEntry(entry),
       child: GestureDetector(
         onTap: () => _showDetail(entry),
         child: Container(
@@ -474,7 +525,7 @@ class _HistoryPageState extends State<HistoryPage> {
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
-                                'LUNAS',
+                                tr('history.paid').toUpperCase(),
                                 style: GoogleFonts.inter(
                                   fontSize: 9,
                                   fontWeight: FontWeight.w600,
@@ -563,251 +614,250 @@ class _DetailSheetState extends State<_DetailSheet> {
     final dateFmt = DateFormat('dd MMMM yyyy', 'id_ID');
     final dateTimeFmt = DateFormat('dd MMM yyyy, HH:mm', 'id_ID');
 
+    final textPrimary = theme.colorScheme.onSurface;
+    final textSecondary = theme.colorScheme.onSurface.withValues(alpha: 0.5);
+    final cardBg = theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4);
+    final borderColor = theme.colorScheme.outlineVariant;
+    final successColor = AppColors.successFor(theme.brightness);
+    final warningColor = AppColors.warningFor(theme.brightness);
+
     return DraggableScrollableSheet(
       initialChildSize: 0.7,
       maxChildSize: 0.95,
       minChildSize: 0.4,
       expand: false,
       builder: (context, scrollController) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: ListView(
-            controller: scrollController,
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-            children: [
-              // Handle bar
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+        return ListView(
+          controller: scrollController,
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          children: [
+            // Handle bar
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: textPrimary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const SizedBox(height: 16),
+            ),
+            const SizedBox(height: 16),
 
-              // Header
-              Row(
-                children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: bgColor,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      typeLabel,
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: color,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      entry.nomorDokumen,
-                      style: GoogleFonts.inter(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF1E293B),
-                      ),
-                    ),
-                  ),
-                  Material(
-                    color: bgColor,
-                    borderRadius: BorderRadius.circular(10),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(10),
-                      onTap: () => _handlePrint(context),
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Icon(Icons.print_rounded, color: color, size: 22),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Info section
-              _sectionTitle('Informasi Dokumen', Icons.info_outline, color),
-              const SizedBox(height: 8),
-              _infoRow('Tanggal Dokumen', dateFmt.format(entry.tanggalDokumen)),
-              _infoRow('Dibuat Pada', dateTimeFmt.format(entry.createdAt)),
-              if (isInvoice) ...[
-                if (entry.jatuhTempo != null)
-                  _infoRow('Jatuh Tempo', dateFmt.format(entry.jatuhTempo!)),
-                if (entry.namaPenjual != null &&
-                    entry.namaPenjual!.isNotEmpty)
-                  _infoRow('Penjual', entry.namaPenjual!),
-                if (entry.namaKlien.isNotEmpty)
-                  _infoRow('Pembeli', entry.namaKlien),
-                if (entry.npwpPembeli != null &&
-                    entry.npwpPembeli!.isNotEmpty)
-                  _infoRow('NPWP Pembeli', entry.npwpPembeli!),
-                if (entry.teleponPembeli != null &&
-                    entry.teleponPembeli!.isNotEmpty)
-                  _infoRow('Telepon Pembeli', entry.teleponPembeli!),
-                if (entry.alamatPembeli != null &&
-                    entry.alamatPembeli!.isNotEmpty)
-                  _infoRow('Alamat Pembeli', entry.alamatPembeli!),
-              ] else ...[
-                if (entry.namaToko != null && entry.namaToko!.isNotEmpty)
-                  _infoRow('Toko', entry.namaToko!),
-                if (entry.alamatToko != null && entry.alamatToko!.isNotEmpty)
-                  _infoRow('Alamat Toko', entry.alamatToko!),
-                if (entry.namaKasir != null && entry.namaKasir!.isNotEmpty)
-                  _infoRow('Kasir', entry.namaKasir!),
-              ],
-
-              const SizedBox(height: 20),
-
-              // Items section
-              if (entry.items.isNotEmpty) ...[
-                _sectionTitle(
-                    isInvoice ? 'Item / Layanan' : 'Daftar Barang',
-                    Icons.list_alt_rounded,
-                    color),
-                const SizedBox(height: 8),
-                _buildItemsTable(color, bgColor),
-                const SizedBox(height: 20),
-              ],
-
-              // Totals section
-              _sectionTitle('Ringkasan', Icons.calculate_outlined, color),
-              const SizedBox(height: 8),
-              _buildTotals(color, bgColor),
-
-              // Catatan
-              if (entry.catatan.isNotEmpty) ...[
-                const SizedBox(height: 20),
-                _sectionTitle('Catatan', Icons.notes_rounded, color),
-                const SizedBox(height: 8),
+            // Header
+            Row(
+              children: [
                 Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                        color: const Color(0xFFE2E8F0), width: 0.8),
+                    color: bgColor,
+                    borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    entry.catatan,
+                    typeLabel,
                     style: GoogleFonts.inter(
-                      fontSize: 13,
-                      color: const Color(0xFF475569),
-                      height: 1.5,
-                    ),
-                  ),
-                ),
-              ],
-
-              // Payment status toggle (invoice only)
-              if (entry.docType == DocType.invoice) ...[
-                const SizedBox(height: 20),
-                GestureDetector(
-                  onTap: () async {
-                    final newStatus =
-                        entry.paymentStatus == PaymentStatus.paid
-                            ? PaymentStatus.unpaid
-                            : PaymentStatus.paid;
-                    await widget.onStatusChanged?.call(newStatus);
-                    setState(() => entry.paymentStatus = newStatus);
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: entry.paymentStatus == PaymentStatus.paid
-                          ? AppColors.successFor(Theme.of(context).brightness).withValues(alpha: 0.08)
-                          : const Color(0xFFD97706).withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: entry.paymentStatus == PaymentStatus.paid
-                            ? AppColors.successFor(Theme.of(context).brightness).withValues(alpha: 0.2)
-                            : const Color(0xFFD97706).withValues(alpha: 0.2),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          entry.paymentStatus == PaymentStatus.paid
-                              ? Icons.check_circle_rounded
-                              : Icons.pending_rounded,
-                          size: 18,
-                          color: entry.paymentStatus == PaymentStatus.paid
-                              ? AppColors.successFor(Theme.of(context).brightness)
-                              : const Color(0xFFD97706),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          entry.paymentStatus == PaymentStatus.paid
-                              ? 'LUNAS'
-                              : 'BELUM LUNAS',
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: entry.paymentStatus == PaymentStatus.paid
-                                ? AppColors.successFor(Theme.of(context).brightness)
-                                : const Color(0xFFD97706),
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          'Tap untuk ubah',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.3),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-
-              // Buat Ulang button
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context); // close sheet
-                    onDuplicate?.call();
-                  },
-                  icon: Icon(Icons.copy_rounded, size: 18, color: color),
-                  label: Text(
-                    'Buat Ulang Dokumen',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
                       color: color,
                     ),
                   ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    side: BorderSide(color: color.withValues(alpha: 0.3)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    entry.nomorDokumen,
+                    style: GoogleFonts.inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: textPrimary,
                     ),
+                  ),
+                ),
+                Material(
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(10),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () => _handlePrint(context),
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Icon(Icons.print_rounded, color: color, size: 22),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Info section
+            _sectionTitle('Informasi Dokumen', Icons.info_outline, color),
+            const SizedBox(height: 8),
+            _infoRow('Tanggal Dokumen', dateFmt.format(entry.tanggalDokumen), textPrimary, textSecondary),
+            _infoRow('Dibuat Pada', dateTimeFmt.format(entry.createdAt), textPrimary, textSecondary),
+            if (isInvoice) ...[
+              if (entry.jatuhTempo != null)
+                _infoRow('Jatuh Tempo', dateFmt.format(entry.jatuhTempo!), textPrimary, textSecondary),
+              if (entry.namaPenjual != null &&
+                  entry.namaPenjual!.isNotEmpty)
+                _infoRow('Penjual', entry.namaPenjual!, textPrimary, textSecondary),
+              if (entry.namaKlien.isNotEmpty)
+                _infoRow('Pembeli', entry.namaKlien, textPrimary, textSecondary),
+              if (entry.npwpPembeli != null &&
+                  entry.npwpPembeli!.isNotEmpty)
+                _infoRow('NPWP Pembeli', entry.npwpPembeli!, textPrimary, textSecondary),
+              if (entry.teleponPembeli != null &&
+                  entry.teleponPembeli!.isNotEmpty)
+                _infoRow('Telepon Pembeli', entry.teleponPembeli!, textPrimary, textSecondary),
+              if (entry.alamatPembeli != null &&
+                  entry.alamatPembeli!.isNotEmpty)
+                _infoRow('Alamat Pembeli', entry.alamatPembeli!, textPrimary, textSecondary),
+            ] else ...[
+              if (entry.namaToko != null && entry.namaToko!.isNotEmpty)
+                _infoRow('Toko', entry.namaToko!, textPrimary, textSecondary),
+              if (entry.alamatToko != null && entry.alamatToko!.isNotEmpty)
+                _infoRow('Alamat Toko', entry.alamatToko!, textPrimary, textSecondary),
+              if (entry.namaKasir != null && entry.namaKasir!.isNotEmpty)
+                _infoRow('Kasir', entry.namaKasir!, textPrimary, textSecondary),
+            ],
+
+            const SizedBox(height: 20),
+
+            // Items section
+            if (entry.items.isNotEmpty) ...[
+              _sectionTitle(
+                  isInvoice ? 'Item / Layanan' : 'Daftar Barang',
+                  Icons.list_alt_rounded,
+                  color),
+              const SizedBox(height: 8),
+              _buildItemsTable(color, bgColor, textPrimary, textSecondary, borderColor, cardBg),
+              const SizedBox(height: 20),
+            ],
+
+            // Totals section
+            _sectionTitle('Ringkasan', Icons.calculate_outlined, color),
+            const SizedBox(height: 8),
+            _buildTotals(color, bgColor),
+
+            // Catatan
+            if (entry.catatan.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              _sectionTitle('Catatan', Icons.notes_rounded, color),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: borderColor, width: 0.8),
+                ),
+                child: Text(
+                  entry.catatan,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: textPrimary.withValues(alpha: 0.7),
+                    height: 1.5,
                   ),
                 ),
               ),
             ],
-          ),
+
+            // Payment status toggle (invoice only)
+            if (entry.docType == DocType.invoice) ...[
+              const SizedBox(height: 20),
+              GestureDetector(
+                onTap: () async {
+                  final newStatus =
+                      entry.paymentStatus == PaymentStatus.paid
+                          ? PaymentStatus.unpaid
+                          : PaymentStatus.paid;
+                  await widget.onStatusChanged?.call(newStatus);
+                  setState(() => entry.paymentStatus = newStatus);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: (entry.paymentStatus == PaymentStatus.paid
+                            ? successColor
+                            : warningColor)
+                        .withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: (entry.paymentStatus == PaymentStatus.paid
+                              ? successColor
+                              : warningColor)
+                          .withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        entry.paymentStatus == PaymentStatus.paid
+                            ? Icons.check_circle_rounded
+                            : Icons.pending_rounded,
+                        size: 18,
+                        color: entry.paymentStatus == PaymentStatus.paid
+                            ? successColor
+                            : warningColor,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        entry.paymentStatus == PaymentStatus.paid
+                            ? tr('history.paid').toUpperCase()
+                            : tr('history.unpaid').toUpperCase(),
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: entry.paymentStatus == PaymentStatus.paid
+                              ? successColor
+                              : warningColor,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        tr('history.tap_to_change'),
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+
+            // Buat Ulang button
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  onDuplicate?.call();
+                },
+                icon: Icon(Icons.copy_rounded, size: 18, color: color),
+                label: Text(
+                  tr('history.duplicate'),
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  side: BorderSide(color: color.withValues(alpha: 0.3)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+          ],
         );
       },
     );
@@ -851,7 +901,9 @@ class _DetailSheetState extends State<_DetailSheet> {
             title: 'Preview Invoice',
             filename: 'Invoice_${faktur.nomorFaktur.replaceAll('/', '-')}.pdf',
             buildPdf: (format) => PdfService.buildBytes(faktur, format,
-                logoBytes: logoBytes, signatureBytes: signatureBytes),
+                logoBytes: logoBytes,
+                signatureBytes: signatureBytes,
+                templateConfig: settings.templateConfig),
           ),
         ),
       );
@@ -886,7 +938,8 @@ class _DetailSheetState extends State<_DetailSheet> {
             buildPdf: (format) => StrukPdfService.buildBytes(struk, format,
                 logoBytes: logoBytes,
                 currencySymbol: settings.currencySymbol,
-                currencyLocale: settings.currencyLocale),
+                currencyLocale: settings.currencyLocale,
+                templateConfig: settings.templateConfig),
             canChangePageFormat: false,
             initialPageFormat: const PdfPageFormat(226.77, double.infinity,
                 marginAll: 12),
@@ -921,7 +974,7 @@ class _DetailSheetState extends State<_DetailSheet> {
     );
   }
 
-  Widget _infoRow(String label, String value) {
+  Widget _infoRow(String label, String value, Color textPrimary, Color textSecondary) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
@@ -933,7 +986,7 @@ class _DetailSheetState extends State<_DetailSheet> {
               label,
               style: GoogleFonts.inter(
                 fontSize: 12,
-                color: const Color(0xFF94A3B8),
+                color: textSecondary,
               ),
             ),
           ),
@@ -943,7 +996,7 @@ class _DetailSheetState extends State<_DetailSheet> {
               style: GoogleFonts.inter(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
-                color: const Color(0xFF1E293B),
+                color: textPrimary,
               ),
             ),
           ),
@@ -952,11 +1005,11 @@ class _DetailSheetState extends State<_DetailSheet> {
     );
   }
 
-  Widget _buildItemsTable(Color color, Color bgColor) {
+  Widget _buildItemsTable(Color color, Color bgColor, Color textPrimary, Color textSecondary, Color borderColor, Color cardBg) {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 0.8),
+        border: Border.all(color: borderColor, width: 0.8),
       ),
       child: Column(
         children: [
@@ -1014,11 +1067,11 @@ class _DetailSheetState extends State<_DetailSheet> {
               padding:
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: i.isEven ? Colors.white : const Color(0xFFFAFBFC),
+                color: i.isEven ? Colors.transparent : cardBg,
                 border: i < entry.items.length - 1
-                    ? const Border(
+                    ? Border(
                         bottom: BorderSide(
-                            color: Color(0xFFF1F5F9), width: 0.8))
+                            color: borderColor, width: 0.8))
                     : null,
               ),
               child: Row(
@@ -1027,7 +1080,7 @@ class _DetailSheetState extends State<_DetailSheet> {
                     width: 28,
                     child: Text('${i + 1}',
                         style: GoogleFonts.inter(
-                            fontSize: 12, color: const Color(0xFF94A3B8))),
+                            fontSize: 12, color: textSecondary)),
                   ),
                   Expanded(
                     flex: 3,
@@ -1039,14 +1092,14 @@ class _DetailSheetState extends State<_DetailSheet> {
                           style: GoogleFonts.inter(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
-                            color: const Color(0xFF1E293B),
+                            color: textPrimary,
                           ),
                         ),
                         Text(
                           '@ ${currency.format(item.hargaSatuan)}',
                           style: GoogleFonts.inter(
                             fontSize: 11,
-                            color: const Color(0xFF94A3B8),
+                            color: textSecondary,
                           ),
                         ),
                       ],
@@ -1057,7 +1110,7 @@ class _DetailSheetState extends State<_DetailSheet> {
                       '${_fmtQty(item.kuantitas)} ${item.satuan}',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.inter(
-                          fontSize: 12, color: const Color(0xFF475569)),
+                          fontSize: 12, color: textPrimary.withValues(alpha: 0.7)),
                     ),
                   ),
                   Expanded(
@@ -1068,7 +1121,7 @@ class _DetailSheetState extends State<_DetailSheet> {
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: const Color(0xFF1E293B),
+                        color: textPrimary,
                       ),
                     ),
                   ),

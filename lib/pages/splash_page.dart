@@ -3,9 +3,10 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../widgets/app_logo.dart';
-import 'home_page.dart';
+import 'main_navigation.dart';
+import 'onboarding_page.dart';
 
-/// Root widget that shows splash then transitions to HomePage.
+/// Root widget that shows splash then transitions to MainNavigation or Onboarding.
 /// No Navigator usage — just swaps child widgets to avoid GlobalKey conflicts.
 class SplashWrapper extends StatefulWidget {
   const SplashWrapper({super.key});
@@ -16,13 +17,32 @@ class SplashWrapper extends StatefulWidget {
 
 class _SplashWrapperState extends State<SplashWrapper> {
   bool _showSplash = true;
+  bool _needsOnboarding = false;
+  bool _checkDone = false;
 
   @override
   void initState() {
     super.initState();
-    Timer(const Duration(milliseconds: 2600), () {
-      if (mounted) setState(() => _showSplash = false);
-    });
+    _init();
+  }
+
+  Future<void> _init() async {
+    final needsOnboarding = await shouldShowOnboarding();
+
+    // Wait minimum splash duration
+    await Future.delayed(const Duration(milliseconds: 2600));
+
+    if (mounted) {
+      setState(() {
+        _needsOnboarding = needsOnboarding;
+        _checkDone = true;
+        _showSplash = false;
+      });
+    }
+  }
+
+  void _onOnboardingComplete() {
+    setState(() => _needsOnboarding = false);
   }
 
   @override
@@ -31,7 +51,12 @@ class _SplashWrapperState extends State<SplashWrapper> {
       duration: const Duration(milliseconds: 400),
       child: _showSplash
           ? const _SplashContent(key: ValueKey('splash'))
-          : const HomePage(key: ValueKey('home')),
+          : _checkDone && _needsOnboarding
+              ? OnboardingPage(
+                  key: const ValueKey('onboarding'),
+                  onComplete: _onOnboardingComplete,
+                )
+              : const MainNavigation(key: ValueKey('home')),
     );
   }
 }

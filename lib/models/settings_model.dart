@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'doc_template_config.dart';
 
 class BankAccount {
   String namaBank;
@@ -47,6 +48,9 @@ class SettingsModel {
   String invoicePrefix;
   String strukPrefix;
 
+  // Document templates
+  DocTemplateConfig templateConfig;
+
   SettingsModel({
     this.namaToko = '',
     this.alamat = '',
@@ -62,7 +66,9 @@ class SettingsModel {
     this.currency = 'IDR',
     this.invoicePrefix = 'INV',
     this.strukPrefix = 'STR',
-  }) : bankAccounts = bankAccounts ?? [];
+    DocTemplateConfig? templateConfig,
+  })  : bankAccounts = bankAccounts ?? [],
+        templateConfig = templateConfig ?? DocTemplateConfig();
 
   bool get hasLogo => logoBytes != null && logoBytes!.isNotEmpty;
   bool get hasSignature => signatureBytes != null && signatureBytes!.isNotEmpty;

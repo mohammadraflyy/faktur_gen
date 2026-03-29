@@ -3,8 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'pages/splash_page.dart';
+import 'services/backup_service.dart';
 import 'services/notification_service.dart';
 import 'services/reminder_service.dart';
+import 'services/locale_service.dart';
 import 'services/theme_service.dart';
 
 void main() async {
@@ -14,6 +16,7 @@ void main() async {
   try {
     await initializeDateFormatting('id_ID', null);
     await ThemeService.load();
+    await LocaleService.load();
   } catch (e) {
     debugPrint('[main] Pre-init error (non-fatal): $e');
   }
@@ -32,6 +35,10 @@ void main() async {
       },
     );
     await ReminderService.rescheduleNotifications();
+    // Auto-backup (silent, won't block UI)
+    BackupService.autoBackupIfNeeded().then((did) {
+      if (did) debugPrint('[main] Auto-backup completed');
+    });
   } catch (e) {
     debugPrint('[main] Post-init error (non-fatal): $e');
   }
@@ -75,6 +82,9 @@ class AppColors {
       brightness == Brightness.dark ? successSoft : success;
 }
 
+/// Global navigator key for deep navigation from notifications.
+final navigatorKey = GlobalKey<NavigatorState>();
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -89,13 +99,17 @@ class MyApp extends StatelessWidget {
         SystemChrome.setSystemUIOverlayStyle(
           isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
         );
-        return MaterialApp(
+        return ValueListenableBuilder<AppLanguage>(
+          valueListenable: LocaleService.languageNotifier,
+          builder: (context, _, __) => MaterialApp(
+          navigatorKey: navigatorKey,
           title: 'Faktura',
           debugShowCheckedModeBanner: false,
           themeMode: themeMode,
           theme: _light(),
           darkTheme: _dark(),
           home: const SplashWrapper(),
+        ),
         );
       },
     );

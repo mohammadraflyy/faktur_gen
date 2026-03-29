@@ -249,13 +249,32 @@ class _FakturPageState extends State<FakturPage> {
   }
 
   void _removeItem(int index) {
-    if (_faktur.items.length > 1) {
-      setState(() {
-        _faktur.items.removeAt(index);
-        _itemCtrls[index].dispose();
-        _itemCtrls.removeAt(index);
-      });
-    }
+    if (_faktur.items.length <= 1) return;
+    final removedItem = _faktur.items[index];
+    final removedCtrl = _itemCtrls[index];
+    setState(() {
+      _faktur.items.removeAt(index);
+      _itemCtrls.removeAt(index);
+    });
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Item "${removedItem.namaBarang.isNotEmpty ? removedItem.namaBarang : 'Item ${index + 1}'}" dihapus',
+        ),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () {
+            setState(() {
+              final insertAt = index.clamp(0, _faktur.items.length);
+              _faktur.items.insert(insertAt, removedItem);
+              _itemCtrls.insert(insertAt, removedCtrl);
+            });
+          },
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
   Future<void> _generatePdf() async {
@@ -314,7 +333,9 @@ class _FakturPageState extends State<FakturPage> {
           title: 'Preview Invoice',
           filename: 'Invoice_${faktur.nomorFaktur.replaceAll('/', '-')}.pdf',
           buildPdf: (format) => PdfService.buildBytes(faktur, format,
-              logoBytes: logoBytes, signatureBytes: signatureBytes),
+              logoBytes: logoBytes,
+              signatureBytes: signatureBytes,
+              templateConfig: _settings.templateConfig),
         ),
       ),
     );
@@ -644,7 +665,7 @@ class _FakturPageState extends State<FakturPage> {
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 40),
+          padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 24),
           children: [
             _buildPenjualBanner(theme),
             const SizedBox(height: 24),
@@ -657,10 +678,13 @@ class _FakturPageState extends State<FakturPage> {
             _buildTotalCard(theme),
             const SizedBox(height: 24),
             _buildCatatanCard(theme),
-            const SizedBox(height: 32),
-            _buildGenerateButton(theme, isTablet: isTablet),
-            const SizedBox(height: 24),
           ],
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(hPad, 10, hPad, 8),
+          child: _buildGenerateButton(theme, isTablet: isTablet),
         ),
       ),
     ),
@@ -832,6 +856,17 @@ class _FakturPageState extends State<FakturPage> {
     );
   }
 
+  void _reorderItem(int oldIndex, int newIndex) {
+    setState(() {
+      if (newIndex > oldIndex) newIndex--;
+      final item = _faktur.items.removeAt(oldIndex);
+      _faktur.items.insert(newIndex, item);
+      final ctrl = _itemCtrls.removeAt(oldIndex);
+      _itemCtrls.insert(newIndex, ctrl);
+      _isDirty = true;
+    });
+  }
+
   Widget _buildItemSection(ThemeData theme) {
     return _card(
       theme,
@@ -876,13 +911,35 @@ class _FakturPageState extends State<FakturPage> {
                 ),
               ),
               const Spacer(),
-              if (_faktur.items.length > 1)
+              if (_faktur.items.length > 1) ...[
+                if (index > 0)
+                  GestureDetector(
+                    onTap: () => _reorderItem(index, index - 1),
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: Icon(Icons.arrow_upward_rounded,
+                          size: 16,
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.3)),
+                    ),
+                  ),
+                if (index < _faktur.items.length - 1)
+                  GestureDetector(
+                    onTap: () => _reorderItem(index, index + 2),
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: Icon(Icons.arrow_downward_rounded,
+                          size: 16,
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.3)),
+                    ),
+                  ),
+                const SizedBox(width: 4),
                 GestureDetector(
                   onTap: () => _removeItem(index),
                   child: Icon(Icons.close_rounded,
                       size: 18,
                       color: theme.colorScheme.onSurface.withValues(alpha: 0.3)),
                 ),
+              ],
             ],
           ),
           const SizedBox(height: 12),
@@ -1229,9 +1286,9 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
       expand: false,
       builder: (context, scrollController) {
         return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            color: theme.scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(
             children: [
@@ -1245,7 +1302,7 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: Colors.grey[300],
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -1261,7 +1318,7 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
                           style: GoogleFonts.inter(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
-                            color: const Color(0xFF1E293B),
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                         const Spacer(),
@@ -1269,7 +1326,7 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
                           '${widget.contacts.length} kontak',
                           style: GoogleFonts.inter(
                             fontSize: 12,
-                            color: const Color(0xFF94A3B8),
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45),
                           ),
                         ),
                       ],
@@ -1282,10 +1339,10 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
                       decoration: InputDecoration(
                         hintText: 'Cari nama atau alamat...',
                         hintStyle: GoogleFonts.inter(
-                            fontSize: 13, color: const Color(0xFF94A3B8)),
+                            fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45)),
                         prefixIcon: const Icon(Icons.search, size: 20),
                         filled: true,
-                        fillColor: const Color(0xFFF1F5F9),
+                        fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 10),
                         border: OutlineInputBorder(
@@ -1315,14 +1372,14 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
                                   ? 'Belum ada kontak tersimpan'
                                   : 'Tidak ditemukan',
                               style: GoogleFonts.inter(
-                                  fontSize: 14, color: Colors.grey[400]),
+                                  fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35)),
                             ),
                             if (widget.contacts.isEmpty) ...[
                               const SizedBox(height: 4),
                               Text(
                                 'Kontak otomatis tersimpan saat buat invoice',
                                 style: GoogleFonts.inter(
-                                    fontSize: 12, color: Colors.grey[400]),
+                                    fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35)),
                               ),
                             ],
                           ],
@@ -1392,20 +1449,20 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
                       style: GoogleFonts.inter(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: const Color(0xFF1E293B),
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                     if (contact.npwp.isNotEmpty)
                       Text(
                         'NPWP: ${contact.npwp}',
                         style: GoogleFonts.inter(
-                            fontSize: 11, color: const Color(0xFF94A3B8)),
+                            fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45)),
                       ),
                     if (contact.alamat.isNotEmpty)
                       Text(
                         contact.alamat,
                         style: GoogleFonts.inter(
-                            fontSize: 11, color: const Color(0xFF64748B)),
+                            fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55)),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1414,8 +1471,8 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
               ),
               // Delete
               IconButton(
-                icon: const Icon(Icons.delete_outline,
-                    size: 18, color: Color(0xFFCBD5E1)),
+                icon: Icon(Icons.delete_outline,
+                    size: 18, color: theme.colorScheme.onSurface.withValues(alpha: 0.3)),
                 onPressed: () => _confirmDelete(contact),
                 tooltip: 'Hapus kontak',
               ),
@@ -1460,7 +1517,7 @@ class _TemplatePickerSheet extends StatelessWidget {
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: Colors.grey[300],
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -1513,11 +1570,11 @@ class _TemplatePickerSheet extends StatelessWidget {
                             ? '${t.namaPembeli} - ${t.items.length} item'
                             : '${t.items.length} item',
                         style: GoogleFonts.inter(
-                            fontSize: 12, color: Colors.grey),
+                            fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
                       ),
                       trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline,
-                            size: 18, color: Colors.grey),
+                        icon: Icon(Icons.delete_outline,
+                            size: 18, color: theme.colorScheme.onSurface.withValues(alpha: 0.4)),
                         onPressed: () async {
                           await TemplateService.delete(t.id);
                           if (context.mounted) Navigator.pop(context);
@@ -1676,7 +1733,7 @@ class _CatalogPickerSheetState extends State<_CatalogPickerSheet> {
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: Colors.grey[300],
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -1721,7 +1778,7 @@ class _CatalogPickerSheetState extends State<_CatalogPickerSheet> {
                               ? 'Katalog kosong. Tap "Baru" untuk menambah.'
                               : 'Tidak ditemukan',
                           style: GoogleFonts.inter(
-                              fontSize: 13, color: Colors.grey),
+                              fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
                         ),
                       )
                     : ListView.builder(
@@ -1737,11 +1794,11 @@ class _CatalogPickerSheetState extends State<_CatalogPickerSheet> {
                             subtitle: Text(
                               '${item.satuan} - ${NumberFormat.currency(locale: widget.currencyLocale, symbol: widget.currencySymbol, decimalDigits: 0).format(item.hargaSatuan)}',
                               style: GoogleFonts.inter(
-                                  fontSize: 12, color: Colors.grey),
+                                  fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
                             ),
                             trailing: IconButton(
-                              icon: const Icon(Icons.delete_outline,
-                                  size: 16, color: Colors.grey),
+                              icon: Icon(Icons.delete_outline,
+                                  size: 16, color: theme.colorScheme.onSurface.withValues(alpha: 0.4)),
                               onPressed: () async {
                                 await CatalogService.delete(item.id);
                                 final refreshed =

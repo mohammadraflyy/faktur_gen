@@ -1,8 +1,11 @@
 import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import '../main.dart' show navigatorKey;
 import '../models/reminder_model.dart';
+import '../pages/reminder_page.dart';
 
 class NotificationService {
   static FlutterLocalNotificationsPlugin? _plugin;
@@ -44,9 +47,23 @@ class NotificationService {
         AndroidInitializationSettings('@mipmap/ic_launcher');
     const initSettings = InitializationSettings(android: androidSettings);
 
-    final success = await _plugin!.initialize(initSettings);
+    final success = await _plugin!.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: _onNotificationTap,
+    );
     debugPrint('[NotifService] init result: $success');
     _initialized = true;
+  }
+
+  static void _onNotificationTap(NotificationResponse response) {
+    debugPrint('[NotifService] Notification tapped: ${response.payload}');
+    // Navigate to reminder page
+    final ctx = navigatorKey.currentContext;
+    if (ctx != null) {
+      Navigator.of(ctx).push(
+        MaterialPageRoute(builder: (_) => const ReminderPage()),
+      );
+    }
   }
 
   static Future<bool> requestPermission() async {
@@ -72,8 +89,8 @@ class NotificationService {
     const details = NotificationDetails(android: _androidDetails);
     await _plugin!.show(
       0,
-      'Test Notifikasi',
-      'Notifikasi pengingat berfungsi dengan baik!',
+      'Test Notifikasi Pengingat',
+      'Sistem notifikasi pengingat layanan berfungsi dengan baik.',
       details,
     );
     debugPrint('[NotifService] Test notification sent');
@@ -151,8 +168,8 @@ class NotificationService {
       await _scheduleNotification(
         baseId,
         scheduledDate,
-        'Pengingat: $serviceName',
-        '$contactName — saatnya $serviceName',
+        'Pengingat Layanan - $serviceName',
+        'Pelanggan: $contactName\nLayanan $serviceName sudah jatuh tempo hari ini. Segera ditindaklanjuti.',
       );
     }
 
@@ -163,11 +180,12 @@ class NotificationService {
       );
       if (followUpDate.isAfter(now)) {
         final followUpId = (baseId + j) % 2147483647;
+        final menit = _followUpIntervalMinutes * j;
         await _scheduleNotification(
           followUpId,
           followUpDate,
-          '⏰ Pengingat: $serviceName',
-          '$contactName — pengingat ke-$j, segera tindak lanjuti!',
+          'Pengingat ke-$j - $serviceName',
+          'Pelanggan: $contactName\nSudah $menit menit sejak pengingat pertama. Belum ditindaklanjuti.',
         );
       }
     }

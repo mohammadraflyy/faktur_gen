@@ -31,7 +31,10 @@ class PdfPreviewPage extends StatelessWidget {
         actions: [
           TextButton.icon(
             onPressed: () {
-              Navigator.of(context).popUntil((route) => route.isFirst);
+              // Pop preview + form page, back to MainNavigation
+              Navigator.of(context)
+                ..pop()  // close PdfPreviewPage
+                ..pop(); // close FakturPage/StrukPage
             },
             icon: Icon(Icons.check_rounded,
                 color: theme.colorScheme.primary, size: 20),

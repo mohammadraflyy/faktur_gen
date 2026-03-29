@@ -6,7 +6,7 @@ import '../main.dart';
 import '../models/contact_model.dart';
 import '../models/reminder_model.dart';
 import '../services/contact_service.dart';
-import '../services/notification_service.dart';
+import '../services/locale_service.dart';
 import '../services/reminder_service.dart';
 import 'faktur_page.dart';
 import 'struk_page.dart';
@@ -40,8 +40,13 @@ class _ReminderPageState extends State<ReminderPage>
   }
 
   Future<void> _load() async {
-    final list = await ReminderService.loadAll();
-    if (mounted) setState(() { _reminders = list; _isLoading = false; });
+    try {
+      final list = await ReminderService.loadAll();
+      if (mounted) setState(() { _reminders = list; _isLoading = false; });
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+      debugPrint('[Reminder] load error: $e');
+    }
   }
 
   List<ReminderModel> get _pending =>
@@ -54,6 +59,8 @@ class _ReminderPageState extends State<ReminderPage>
     final result = await showModalBottomSheet<ReminderModel>(
       context: context,
       isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -67,13 +74,25 @@ class _ReminderPageState extends State<ReminderPage>
 
   Future<void> _markDone(ReminderModel r) async {
     await ReminderService.updateStatus(r.id, ReminderStatus.done);
-    _load();
+    await _load();
+    // Pindah ke tab Selesai agar user melihat item yang baru ditandai
+    _tabCtrl.animateTo(1);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${r.serviceName} untuk ${r.contactName} ${tr('reminder.marked_done')}'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   Future<void> _editReminder(ReminderModel r) async {
     final result = await showModalBottomSheet<ReminderModel>(
       context: context,
       isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -85,29 +104,6 @@ class _ReminderPageState extends State<ReminderPage>
     }
   }
 
-  Future<void> _deleteReminder(ReminderModel r) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Hapus Pengingat?'),
-        content: Text('Hapus pengingat "${r.serviceName}" untuk ${r.contactName}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Batal'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Hapus', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-    if (confirm == true) {
-      await ReminderService.delete(r.id);
-      _load();
-    }
-  }
 
   void _createDocFromReminder(ReminderModel r) {
     if (r.docType == ReminderDocType.struk) {
@@ -153,7 +149,7 @@ class _ReminderPageState extends State<ReminderPage>
   Future<void> _sendWhatsApp(ReminderModel r) async {
     if (r.contactPhone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nomor telepon tidak tersedia')),
+        SnackBar(content: Text(tr('reminder.no_phone'))),
       );
       return;
     }
@@ -177,7 +173,7 @@ class _ReminderPageState extends State<ReminderPage>
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tidak dapat membuka WhatsApp')),
+          SnackBar(content: Text(tr('reminder.wa_fail'))),
         );
       }
     }
@@ -214,7 +210,7 @@ class _ReminderPageState extends State<ReminderPage>
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Detail Pengingat',
+                  tr('reminder.detail_title'),
                   style: GoogleFonts.inter(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -222,104 +218,109 @@ class _ReminderPageState extends State<ReminderPage>
                   ),
                 ),
                 const SizedBox(height: 16),
-                _detailRow(theme, Icons.person_outlined, 'Pelanggan', r.contactName),
+                _detailRow(theme, Icons.person_outlined, tr('reminder.customer'), r.contactName),
                 if (r.contactPhone.isNotEmpty)
-                  _detailRow(theme, Icons.phone_outlined, 'Telepon', r.contactPhone),
+                  _detailRow(theme, Icons.phone_outlined, tr('common.phone'), r.contactPhone),
                 if (r.contactAddress.isNotEmpty)
-                  _detailRow(theme, Icons.location_on_outlined, 'Alamat', r.contactAddress),
-                _detailRow(theme, Icons.build_outlined, 'Layanan', r.serviceName),
+                  _detailRow(theme, Icons.location_on_outlined, tr('common.address'), r.contactAddress),
+                _detailRow(theme, Icons.build_outlined, tr('reminder.service'), r.serviceName),
                 _detailRow(
                   theme,
                   Icons.calendar_today,
-                  'Tanggal',
+                  tr('reminder.date'),
                   '${_dateFormat.format(r.reminderDate)}, '
                       '${r.reminderHour.toString().padLeft(2, '0')}:'
                       '${r.reminderMinute.toString().padLeft(2, '0')}',
                 ),
                 if (r.isRepeating)
-                  _detailRow(theme, Icons.repeat, 'Ulangi', r.repeatInterval.label),
+                  _detailRow(theme, Icons.repeat, tr('reminder.repeat'), r.repeatInterval.label),
                 if (r.notes.isNotEmpty)
-                  _detailRow(theme, Icons.notes_outlined, 'Catatan', r.notes),
+                  _detailRow(theme, Icons.notes_outlined, tr('reminder.notes'), r.notes),
                 _detailRow(
                   theme,
                   Icons.info_outline,
-                  'Status',
+                  tr('reminder.status'),
                   isOverdue
-                      ? 'Terlewat'
+                      ? tr('reminder.overdue')
                       : isDue
-                          ? 'Jatuh tempo hari ini'
+                          ? tr('reminder.due_today')
                           : r.status == ReminderStatus.pending
-                              ? 'Menunggu'
-                              : 'Selesai',
+                              ? tr('reminder.waiting')
+                              : tr('reminder.done'),
                 ),
                 const SizedBox(height: 16),
-                // Edit button
-                SizedBox(
-                  width: double.infinity,
-                  height: 44,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _editReminder(r);
-                    },
-                    icon: const Icon(Icons.edit_outlined, size: 18),
-                    label: const Text('Edit Pengingat'),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // WhatsApp button
-                SizedBox(
-                  width: double.infinity,
-                  height: 44,
-                  child: FilledButton.icon(
-                    onPressed: () {
+                // Actions
+                if (r.contactPhone.isNotEmpty)
+                  _actionTile(
+                    theme,
+                    icon: Icons.message_rounded,
+                    label: tr('reminder.send_wa'),
+                    color: const Color(0xFF25D366),
+                    onTap: () {
                       Navigator.pop(context);
                       _sendWhatsApp(r);
                     },
-                    icon: const Icon(Icons.message, size: 18),
-                    label: const Text('Kirim WhatsApp'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF25D366),
-                      foregroundColor: Colors.white,
-                    ),
                   ),
+                if (r.hasLastItems)
+                  _actionTile(
+                    theme,
+                    icon: r.docType == ReminderDocType.struk
+                        ? Icons.receipt_outlined
+                        : Icons.receipt_long_outlined,
+                    label: r.docType == ReminderDocType.struk
+                        ? tr('reminder.create_receipt')
+                        : tr('reminder.create_invoice'),
+                    color: r.docType == ReminderDocType.struk
+                        ? const Color(0xFF059669)
+                        : const Color(0xFF2563EB),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _createDocFromReminder(r);
+                    },
+                  ),
+                _actionTile(
+                  theme,
+                  icon: Icons.edit_outlined,
+                  label: tr('reminder.edit_title'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _editReminder(r);
+                  },
                 ),
                 if (r.status == ReminderStatus.pending) ...[
+                  _actionTile(
+                    theme,
+                    icon: Icons.event_repeat_rounded,
+                    label: tr('reminder.reschedule'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _reschedule(r);
+                    },
+                  ),
                   const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: SizedBox(
-                          height: 40,
-                          child: OutlinedButton.icon(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              _reschedule(r);
-                            },
-                            icon: const Icon(Icons.event_repeat, size: 14),
-                            label: const Text('Jadwal Ulang',
-                                style: TextStyle(fontSize: 12)),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: SizedBox(
-                          height: 40,
-                          child: FilledButton.icon(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              _markDone(r);
-                            },
-                            icon: const Icon(Icons.check, size: 14),
-                            label: const Text('Selesai',
-                                style: TextStyle(fontSize: 12)),
-                          ),
-                        ),
-                      ),
-                    ],
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _markDone(r);
+                      },
+                      icon: const Icon(Icons.check_rounded, size: 18),
+                      label: Text(tr('reminder.mark_done')),
+                    ),
                   ),
                 ],
+                _actionTile(
+                  theme,
+                  icon: Icons.delete_outline,
+                  label: tr('common.delete'),
+                  color: Colors.red,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _confirmDelete(r);
+                  },
+                ),
               ],
             ),
           ),
@@ -361,35 +362,49 @@ class _ReminderPageState extends State<ReminderPage>
     );
   }
 
+  Widget _actionTile(
+    ThemeData theme, {
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    Color? color,
+  }) {
+    final c = color ?? theme.colorScheme.onSurface;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: c.withValues(alpha: 0.7)),
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: c,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Pengingat Layanan'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_active_outlined),
-            tooltip: 'Test Notifikasi',
-            onPressed: () async {
-              await NotificationService.showTestNotification();
-              final pending = await NotificationService.getPending();
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                      'Test notifikasi dikirim! (${pending.length} terjadwal)'),
-                ),
-              );
-            },
-          ),
-        ],
+        title: Text(tr('reminder.title')),
         bottom: TabBar(
           controller: _tabCtrl,
           tabs: [
-            Tab(text: 'Aktif (${_pending.length})'),
-            Tab(text: 'Selesai (${_completed.length})'),
+            Tab(text: '${tr('reminder.active')} (${_pending.length})'),
+            Tab(text: '${tr('reminder.done')} (${_completed.length})'),
           ],
         ),
       ),
@@ -412,44 +427,57 @@ class _ReminderPageState extends State<ReminderPage>
   Widget _buildList(ThemeData theme, List<ReminderModel> list,
       {required bool isPending}) {
     if (list.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
           children: [
-            Icon(
-              isPending ? Icons.notifications_none : Icons.check_circle_outline,
-              size: 48,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              isPending
-                  ? 'Belum ada pengingat'
-                  : 'Belum ada pengingat selesai',
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-              ),
-            ),
-            if (isPending) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Tap + untuk menambah pengingat',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
+            SizedBox(
+              height: MediaQuery.sizeOf(context).height * 0.5,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isPending ? Icons.notifications_none : Icons.check_circle_outline,
+                      size: 48,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      isPending
+                          ? tr('reminder.empty_pending')
+                          : tr('reminder.empty_done'),
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    if (isPending) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        tr('reminder.add_hint'),
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-            ],
+            ),
           ],
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
-      itemCount: list.length,
-      itemBuilder: (_, i) => _buildCard(theme, list[i], isPending: isPending),
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView.builder(
+        padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.of(context).padding.bottom + 80),
+        itemCount: list.length,
+        itemBuilder: (_, i) => _buildCard(theme, list[i], isPending: isPending),
+      ),
     );
   }
 
@@ -461,342 +489,223 @@ class _ReminderPageState extends State<ReminderPage>
     final errColor = AppColors.errorFor(theme.brightness);
     final warnColor = AppColors.warningFor(theme.brightness);
 
-    Color borderColor;
+    Color accentColor;
     if (isOverdue) {
-      borderColor = errColor.withValues(alpha: 0.4);
+      accentColor = errColor;
     } else if (isDue) {
-      borderColor = warnColor.withValues(alpha: 0.4);
+      accentColor = warnColor;
     } else {
-      borderColor = theme.dividerTheme.color ?? Colors.grey.shade200;
+      accentColor = theme.colorScheme.primary;
     }
 
-    return GestureDetector(
+    final card = GestureDetector(
       onTap: () => _showDetail(r),
       child: Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: (isOverdue
-                          ? errColor
-                          : isDue
-                              ? warnColor
-                              : theme.colorScheme.primary)
-                      .withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.notifications_active_outlined,
-                  size: 18,
-                  color: isOverdue
-                      ? errColor
-                      : isDue
-                          ? warnColor
-                          : theme.colorScheme.primary,
-                ),
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: (isOverdue || isDue)
+                ? accentColor.withValues(alpha: 0.4)
+                : theme.dividerTheme.color ?? Colors.grey.shade200,
+          ),
+        ),
+        child: Row(
+          children: [
+            // Left accent icon
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: accentColor.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      r.contactName,
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    ),
-                    if (r.contactPhone.isNotEmpty) ...[
-                      const SizedBox(height: 1),
-                      Text(
-                        r.contactPhone,
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
+              child: Icon(
+                Icons.notifications_active_outlined,
+                size: 20,
+                color: accentColor,
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          r.contactName,
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      if (isOverdue || isDue)
+                        Container(
+                          margin: const EdgeInsets.only(left: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: accentColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            isOverdue ? tr('reminder.overdue') : tr('dashboard.today'),
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: accentColor,
+                            ),
+                          ),
+                        ),
                     ],
-                    const SizedBox(height: 2),
-                    Text(
-                      r.serviceName,
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (isPending)
-                PopupMenuButton<String>(
-                  icon: Icon(Icons.more_vert,
-                      size: 18,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.4)),
-                  onSelected: (v) {
-                    if (v == 'edit') _editReminder(r);
-                    if (v == 'done') _markDone(r);
-                    if (v == 'reschedule') _reschedule(r);
-                    if (v == 'delete') _deleteReminder(r);
-                  },
-                  itemBuilder: (_) => [
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: ListTile(
-                        leading: Icon(Icons.edit_outlined, size: 20),
-                        title: Text('Edit',
-                            style: TextStyle(fontSize: 14)),
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'done',
-                      child: ListTile(
-                        leading: Icon(Icons.check_circle_outline, size: 20),
-                        title: Text('Tandai Selesai',
-                            style: TextStyle(fontSize: 14)),
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'reschedule',
-                      child: ListTile(
-                        leading: Icon(Icons.event_repeat, size: 20),
-                        title: Text('Jadwal Ulang',
-                            style: TextStyle(fontSize: 14)),
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: ListTile(
-                        leading:
-                            Icon(Icons.delete_outline, size: 20, color: Colors.red),
-                        title: Text('Hapus',
-                            style: TextStyle(fontSize: 14, color: Colors.red)),
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                    ),
-                  ],
-                )
-              else
-                IconButton(
-                  icon: const Icon(Icons.delete_outline,
-                      size: 18, color: Colors.grey),
-                  onPressed: () => _deleteReminder(r),
-                ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Icon(Icons.calendar_today,
-                  size: 13,
-                  color: isOverdue
-                      ? errColor
-                      : theme.colorScheme.onSurface.withValues(alpha: 0.4)),
-              const SizedBox(width: 6),
-              Text(
-                '${_dateFormat.format(r.reminderDate)}, ${r.reminderHour.toString().padLeft(2, '0')}:${r.reminderMinute.toString().padLeft(2, '0')}',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: isOverdue
-                      ? errColor
-                      : theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                ),
-              ),
-              if (isOverdue) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: errColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(4),
                   ),
-                  child: Text(
-                    'Terlewat',
+                  const SizedBox(height: 3),
+                  Text(
+                    r.serviceName,
                     style: GoogleFonts.inter(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: errColor,
-                    ),
-                  ),
-                ),
-              ] else if (isDue) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: warnColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    'Hari ini',
-                    style: GoogleFonts.inter(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: warnColor,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-          if (r.isRepeating) ...[
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(Icons.repeat, size: 13,
-                    color: theme.colorScheme.primary.withValues(alpha: 0.6)),
-                const SizedBox(width: 6),
-                Text(
-                  r.repeatInterval.label,
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    color: theme.colorScheme.primary.withValues(alpha: 0.7),
-                  ),
-                ),
-              ],
-            ),
-          ],
-          if (r.contactAddress.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(Icons.location_on_outlined, size: 13,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.4)),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    r.contactAddress,
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
+                      fontSize: 13,
+                      color: theme.colorScheme.onSurface
+                          .withValues(alpha: 0.55),
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
-            ),
-          ],
-          if (r.notes.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              r.notes,
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.calendar_today,
+                          size: 11,
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.35)),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${_dateFormat.format(r.reminderDate)}, ${r.reminderHour.toString().padLeft(2, '0')}:${r.reminderMinute.toString().padLeft(2, '0')}',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.4),
+                        ),
+                      ),
+                      if (r.isRepeating) ...[
+                        const SizedBox(width: 8),
+                        Icon(Icons.repeat,
+                            size: 11,
+                            color: theme.colorScheme.primary
+                                .withValues(alpha: 0.5)),
+                        const SizedBox(width: 3),
+                        Text(
+                          r.repeatInterval.label,
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: theme.colorScheme.primary
+                                .withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
               ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
+            // Chevron hint
+            Icon(Icons.chevron_right_rounded,
+                size: 18,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.2)),
           ],
-          if (isPending) ...[
-            if (r.hasLastItems) ...[
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                height: 34,
-                child: OutlinedButton.icon(
-                  onPressed: () => _createDocFromReminder(r),
-                  icon: Icon(
-                    r.docType == ReminderDocType.struk
-                        ? Icons.receipt_outlined
-                        : Icons.receipt_long_outlined,
-                    size: 14,
-                  ),
-                  label: Text(
-                    r.docType == ReminderDocType.struk
-                        ? 'Buat Struk'
-                        : 'Buat Invoice',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: r.docType == ReminderDocType.struk
-                        ? const Color(0xFF059669)
-                        : const Color(0xFF2563EB),
-                    side: BorderSide(
-                      color: r.docType == ReminderDocType.struk
-                          ? const Color(0xFF059669)
-                          : const Color(0xFF2563EB),
-                      width: 0.8,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: 8),
-            if (r.contactPhone.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 34,
-                  child: OutlinedButton.icon(
-                    onPressed: () => _sendWhatsApp(r),
-                    icon: const Icon(Icons.message, size: 14),
-                    label: const Text('Kirim WhatsApp',
-                        style: TextStyle(fontSize: 12)),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF25D366),
-                      side: const BorderSide(
-                          color: Color(0xFF25D366), width: 0.8),
-                    ),
-                  ),
-                ),
-              ),
-            Row(
-              children: [
-                Expanded(
-                  child: SizedBox(
-                    height: 34,
-                    child: OutlinedButton.icon(
-                      onPressed: () => _reschedule(r),
-                      icon: const Icon(Icons.event_repeat, size: 14),
-                      label: const Text('Jadwal Ulang',
-                          style: TextStyle(fontSize: 12)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: SizedBox(
-                    height: 34,
-                    child: FilledButton.icon(
-                      onPressed: () => _markDone(r),
-                      icon: const Icon(Icons.check, size: 14),
-                      label: const Text('Selesai',
-                          style: TextStyle(fontSize: 12)),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
+        ),
+      ),
+    );
+
+    if (!isPending) {
+      // Completed: swipe left to delete only
+      return Dismissible(
+        key: ValueKey(r.id),
+        direction: DismissDirection.endToStart,
+        confirmDismiss: (_) => _confirmDelete(r),
+        background: _swipeBackground(
+          alignment: Alignment.centerRight,
+          color: errColor,
+          icon: Icons.delete_outline,
+        ),
+        child: card,
+      );
+    }
+
+    // Pending: swipe right=done, left=delete
+    return Dismissible(
+      key: ValueKey(r.id),
+      confirmDismiss: (dir) async {
+        if (dir == DismissDirection.startToEnd) {
+          _markDone(r);
+          return false; // don't remove, _markDone reloads
+        } else {
+          return _confirmDelete(r);
+        }
+      },
+      background: _swipeBackground(
+        alignment: Alignment.centerLeft,
+        color: AppColors.successFor(theme.brightness),
+        icon: Icons.check_rounded,
+      ),
+      secondaryBackground: _swipeBackground(
+        alignment: Alignment.centerRight,
+        color: errColor,
+        icon: Icons.delete_outline,
+      ),
+      child: card,
+    );
+  }
+
+  Future<bool> _confirmDelete(ReminderModel r) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(tr('reminder.delete_title')),
+        content:
+            Text('${tr('common.delete')} "${r.serviceName}" untuk ${r.contactName}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(tr('common.cancel')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(tr('common.delete'), style: const TextStyle(color: Colors.red)),
+          ),
         ],
       ),
-    ),
+    );
+    if (confirm == true) {
+      await ReminderService.delete(r.id);
+      _load();
+      return true;
+    }
+    return false;
+  }
+
+  Widget _swipeBackground({
+    required Alignment alignment,
+    required Color color,
+    required IconData icon,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      alignment: alignment,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Icon(icon, color: color, size: 24),
     );
   }
 }
@@ -970,13 +879,25 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
               ),
             ),
             const SizedBox(height: 16),
-            Text(
-              _isEditing ? 'Edit Pengingat' : 'Tambah Pengingat',
-              style: GoogleFonts.inter(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: theme.colorScheme.onSurface,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _isEditing ? tr('reminder.edit_title') : tr('reminder.add_title'),
+                    style: GoogleFonts.inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: Icon(Icons.close_rounded,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.4)),
+                  tooltip: tr('common.close'),
+                ),
+              ],
             ),
             const SizedBox(height: 20),
             Row(
@@ -984,7 +905,7 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
                 Expanded(
                   child: TextFormField(
                     controller: _contactCtrl,
-                    decoration: const InputDecoration(labelText: 'Nama Pelanggan'),
+                    decoration: InputDecoration(labelText: tr('reminder.customer_name')),
                     validator: (v) =>
                         (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
                   ),
@@ -993,7 +914,7 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
                 IconButton(
                   onPressed: _showContactPicker,
                   icon: const Icon(Icons.contacts_outlined),
-                  tooltip: 'Pilih dari kontak',
+                  tooltip: tr('reminder.pick_contact'),
                   style: IconButton.styleFrom(
                     backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.08),
                   ),
@@ -1003,26 +924,26 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
             const SizedBox(height: 14),
             TextFormField(
               controller: _phoneCtrl,
-              decoration: const InputDecoration(
-                labelText: 'No. Telepon / WhatsApp',
-                hintText: 'cth: 08123456789',
+              decoration: InputDecoration(
+                labelText: tr('reminder.phone'),
+                hintText: tr('reminder.phone_hint'),
               ),
               keyboardType: TextInputType.phone,
             ),
             const SizedBox(height: 14),
             TextFormField(
               controller: _addressCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Alamat (opsional)',
+              decoration: InputDecoration(
+                labelText: tr('reminder.address'),
               ),
               maxLines: 2,
             ),
             const SizedBox(height: 14),
             TextFormField(
               controller: _serviceCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Jenis Layanan',
-                hintText: 'cth: Cuci AC, Service Mesin',
+              decoration: InputDecoration(
+                labelText: tr('reminder.service_type'),
+                hintText: tr('reminder.service_hint'),
               ),
               validator: (v) =>
                   (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
@@ -1048,8 +969,8 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
                     onTap: _pickDate,
                     borderRadius: BorderRadius.circular(4),
                     child: InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'Tanggal',
+                      decoration: InputDecoration(
+                        labelText: tr('reminder.date'),
                         suffixIcon: Icon(Icons.calendar_today, size: 18),
                       ),
                       child: Text(
@@ -1066,8 +987,8 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
                     onTap: _pickTime,
                     borderRadius: BorderRadius.circular(4),
                     child: InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'Jam',
+                      decoration: InputDecoration(
+                        labelText: tr('reminder.time'),
                         suffixIcon: Icon(Icons.access_time, size: 18),
                       ),
                       child: Text(
@@ -1094,8 +1015,8 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
             const SizedBox(height: 14),
             DropdownButtonFormField<RepeatInterval>(
               initialValue: _repeatInterval,
-              decoration: const InputDecoration(
-                labelText: 'Ulangi',
+              decoration: InputDecoration(
+                labelText: tr('reminder.repeat'),
                 prefixIcon: Icon(Icons.repeat, size: 20),
               ),
               items: RepeatInterval.values
@@ -1109,9 +1030,9 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
             const SizedBox(height: 14),
             TextFormField(
               controller: _notesCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Catatan (opsional)',
-                hintText: 'cth: Unit outdoor lantai 2',
+              decoration: InputDecoration(
+                labelText: tr('reminder.notes_optional'),
+                hintText: tr('reminder.notes_hint'),
               ),
               maxLines: 2,
             ),
@@ -1122,7 +1043,7 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
               child: FilledButton.icon(
                 onPressed: _submit,
                 icon: Icon(_isEditing ? Icons.save : Icons.alarm_add),
-                label: Text(_isEditing ? 'Simpan Perubahan' : 'Simpan Pengingat'),
+                label: Text(_isEditing ? tr('reminder.save_edit') : tr('reminder.save')),
               ),
             ),
             ],
@@ -1237,16 +1158,16 @@ class _ContactManagerSheetState extends State<_ContactManagerSheet> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Hapus Kontak?'),
-        content: Text('Hapus "${contact.nama}" dari daftar kontak?'),
+        title: Text(tr('contact.delete_title')),
+        content: Text('${tr('common.delete')} "${contact.nama}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Batal'),
+            child: Text(tr('common.cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Hapus', style: TextStyle(color: Colors.red)),
+            child: Text(tr('common.delete'), style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -1289,7 +1210,7 @@ class _ContactManagerSheetState extends State<_ContactManagerSheet> {
                           color: theme.colorScheme.primary, size: 22),
                       const SizedBox(width: 8),
                       Text(
-                        'Kontak',
+                        tr('contact.title'),
                         style: GoogleFonts.inter(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
@@ -1300,7 +1221,7 @@ class _ContactManagerSheetState extends State<_ContactManagerSheet> {
                       TextButton.icon(
                         onPressed: _addContact,
                         icon: const Icon(Icons.person_add_outlined, size: 18),
-                        label: const Text('Tambah', style: TextStyle(fontSize: 13)),
+                        label: Text(tr('contact.add'), style: const TextStyle(fontSize: 13)),
                       ),
                     ],
                   ),
@@ -1309,12 +1230,12 @@ class _ContactManagerSheetState extends State<_ContactManagerSheet> {
                     controller: _searchCtrl,
                     onChanged: _onSearch,
                     decoration: InputDecoration(
-                      hintText: 'Cari nama atau telepon...',
+                      hintText: tr('contact.search'),
                       hintStyle: GoogleFonts.inter(
-                          fontSize: 13, color: const Color(0xFF94A3B8)),
+                          fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45)),
                       prefixIcon: const Icon(Icons.search, size: 20),
                       filled: true,
-                      fillColor: const Color(0xFFF1F5F9),
+                      fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 10),
                       border: OutlineInputBorder(
@@ -1336,21 +1257,21 @@ class _ContactManagerSheetState extends State<_ContactManagerSheet> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(Icons.person_off_outlined,
-                              size: 48, color: Colors.grey[300]),
+                              size: 48, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15)),
                           const SizedBox(height: 8),
                           Text(
                             _contacts.isEmpty
-                                ? 'Belum ada kontak'
-                                : 'Tidak ditemukan',
+                                ? tr('contact.empty')
+                                : tr('contact.not_found'),
                             style: GoogleFonts.inter(
-                                fontSize: 14, color: Colors.grey[400]),
+                                fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35)),
                           ),
                           if (_contacts.isEmpty) ...[
                             const SizedBox(height: 4),
                             Text(
                               'Tap "Tambah" untuk menambah kontak baru',
                               style: GoogleFonts.inter(
-                                  fontSize: 12, color: Colors.grey[400]),
+                                  fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35)),
                             ),
                           ],
                         ],
@@ -1395,23 +1316,23 @@ class _ContactManagerSheetState extends State<_ContactManagerSheet> {
                               if (v == 'delete') _deleteContact(c);
                             },
                             itemBuilder: (_) => [
-                              const PopupMenuItem(
+                              PopupMenuItem(
                                 value: 'edit',
                                 child: ListTile(
-                                  leading: Icon(Icons.edit_outlined, size: 20),
-                                  title: Text('Edit',
-                                      style: TextStyle(fontSize: 14)),
+                                  leading: const Icon(Icons.edit_outlined, size: 20),
+                                  title: Text(tr('common.edit'),
+                                      style: const TextStyle(fontSize: 14)),
                                   dense: true,
                                   contentPadding: EdgeInsets.zero,
                                 ),
                               ),
-                              const PopupMenuItem(
+                              PopupMenuItem(
                                 value: 'delete',
                                 child: ListTile(
-                                  leading: Icon(Icons.delete_outline,
+                                  leading: const Icon(Icons.delete_outline,
                                       size: 20, color: Colors.red),
-                                  title: Text('Hapus',
-                                      style: TextStyle(
+                                  title: Text(tr('common.delete'),
+                                      style: const TextStyle(
                                           fontSize: 14, color: Colors.red)),
                                   dense: true,
                                   contentPadding: EdgeInsets.zero,
@@ -1504,7 +1425,7 @@ class _ContactFormSheetState extends State<_ContactFormSheet> {
               ),
               const SizedBox(height: 16),
               Text(
-                _isEditing ? 'Edit Kontak' : 'Tambah Kontak',
+                _isEditing ? tr('contact.edit_title') : tr('contact.add_title'),
                 style: GoogleFonts.inter(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -1513,24 +1434,24 @@ class _ContactFormSheetState extends State<_ContactFormSheet> {
               const SizedBox(height: 20),
               TextFormField(
                 controller: _namaCtrl,
-                decoration: const InputDecoration(labelText: 'Nama'),
+                decoration: InputDecoration(labelText: tr('contact.name')),
                 validator: (v) =>
                     (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
               ),
               const SizedBox(height: 14),
               TextFormField(
                 controller: _teleponCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'No. Telepon / WhatsApp',
-                  hintText: 'cth: 08123456789',
+                decoration: InputDecoration(
+                  labelText: tr('reminder.phone'),
+                  hintText: tr('reminder.phone_hint'),
                 ),
                 keyboardType: TextInputType.phone,
               ),
               const SizedBox(height: 14),
               TextFormField(
                 controller: _alamatCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Alamat (opsional)',
+                decoration: InputDecoration(
+                  labelText: tr('reminder.address'),
                 ),
                 maxLines: 2,
               ),
@@ -1541,7 +1462,7 @@ class _ContactFormSheetState extends State<_ContactFormSheet> {
                 child: FilledButton.icon(
                   onPressed: _save,
                   icon: Icon(_isEditing ? Icons.save : Icons.person_add),
-                  label: Text(_isEditing ? 'Simpan' : 'Tambah Kontak'),
+                  label: Text(_isEditing ? tr('common.save') : tr('contact.add_title')),
                 ),
               ),
             ],
