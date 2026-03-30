@@ -51,6 +51,12 @@ class SettingsModel {
   // Document templates
   DocTemplateConfig templateConfig;
 
+  // QRIS
+  String qrisMerchantId;
+
+  // Client numbering
+  bool useClientNumbering;
+
   SettingsModel({
     this.namaToko = '',
     this.alamat = '',
@@ -67,6 +73,8 @@ class SettingsModel {
     this.invoicePrefix = 'INV',
     this.strukPrefix = 'STR',
     DocTemplateConfig? templateConfig,
+    this.qrisMerchantId = '',
+    this.useClientNumbering = false,
   })  : bankAccounts = bankAccounts ?? [],
         templateConfig = templateConfig ?? DocTemplateConfig();
 

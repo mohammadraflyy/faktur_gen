@@ -96,6 +96,19 @@ class _DashboardPageState extends State<DashboardPage> {
             e.paymentStatus == PaymentStatus.unpaid)
         .fold(0.0, (s, e) => s + e.totalAmount);
 
+    // Overdue invoices (unpaid + past due date)
+    final overdueEntries = _entries.where((e) =>
+        e.docType == DocType.invoice &&
+        e.paymentStatus == PaymentStatus.unpaid &&
+        e.jatuhTempo != null &&
+        e.jatuhTempo!.isBefore(now)).toList();
+    final overdueTotal = overdueEntries.fold(0.0, (s, e) => s + e.totalAmount);
+
+    // Collected this month (paid invoices this month)
+    final collectedThisMonth = thisMonth
+        .where((e) => e.paymentStatus == PaymentStatus.paid)
+        .fold(0.0, (s, e) => s + e.totalAmount);
+
     final hasData = _entries.isNotEmpty;
 
     // Monthly breakdown (last 6 months)
@@ -213,14 +226,83 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
                 if (unpaidCount > 0) ...[
                   const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _statCard(
+                          theme,
+                          label: tr('dashboard.unpaid'),
+                          value: _currency.format(unpaidTotal),
+                          sub: '$unpaidCount ${tr('dashboard.invoice').toLowerCase()}',
+                          icon: Icons.warning_amber_rounded,
+                          color: AppColors.warningFor(theme.brightness),
+                        ),
+                      ),
+                      if (overdueEntries.isNotEmpty) ...[
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _statCard(
+                            theme,
+                            label: tr('dashboard.overdue_amount'),
+                            value: _currency.format(overdueTotal),
+                            sub: '${overdueEntries.length} ${tr('dashboard.invoice').toLowerCase()}',
+                            icon: Icons.error_outline_rounded,
+                            color: AppColors.errorFor(theme.brightness),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+                if (collectedThisMonth > 0) ...[
+                  const SizedBox(height: 12),
                   _statCard(
                     theme,
-                    label: tr('dashboard.unpaid'),
-                    value: _currency.format(unpaidTotal),
-                    sub: '$unpaidCount ${tr('dashboard.invoice').toLowerCase()}',
-                    icon: Icons.warning_amber_rounded,
-                    color: AppColors.warningFor(theme.brightness),
+                    label: tr('dashboard.collected_month'),
+                    value: _currency.format(collectedThisMonth),
+                    sub: tr('dashboard.this_month_short'),
+                    icon: Icons.check_circle_outline_rounded,
+                    color: AppColors.successFor(theme.brightness),
                   ),
+                ],
+
+                // Overdue invoices list
+                if (overdueEntries.isNotEmpty) ...[
+                  const SizedBox(height: 28),
+                  _sectionLabel(theme, tr('dashboard.overdue_invoices')),
+                  const SizedBox(height: 12),
+                  ...overdueEntries.take(5).map((e) {
+                    final daysOverdue = now.difference(e.jatuhTempo!).inDays;
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(e.namaKlien,
+                                    style: GoogleFonts.inter(fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: theme.colorScheme.onSurface)),
+                                  const SizedBox(height: 2),
+                                  Text('${e.nomorDokumen} · $daysOverdue ${tr('dashboard.days_overdue')}',
+                                    style: GoogleFonts.inter(fontSize: 12,
+                                      color: AppColors.errorFor(theme.brightness))),
+                                ],
+                              ),
+                            ),
+                            Text(_currency.format(e.totalAmount),
+                              style: GoogleFonts.inter(fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: theme.colorScheme.onSurface)),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
                 ],
 
                 const SizedBox(height: 28),

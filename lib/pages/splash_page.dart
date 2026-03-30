@@ -2,11 +2,17 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../services/auth_service.dart';
+import '../services/migration_service.dart';
 import '../widgets/app_logo.dart';
+import 'login_page.dart';
 import 'main_navigation.dart';
 import 'onboarding_page.dart';
 
-/// Root widget that shows splash then transitions to MainNavigation or Onboarding.
+const _kSkipLogin = 's_skip_login';
+
+/// Root widget that shows splash then transitions to Login/MainNavigation/Onboarding.
 /// No Navigator usage — just swaps child widgets to avoid GlobalKey conflicts.
 class SplashWrapper extends StatefulWidget {
   const SplashWrapper({super.key});
@@ -15,10 +21,10 @@ class SplashWrapper extends StatefulWidget {
   State<SplashWrapper> createState() => _SplashWrapperState();
 }
 
+enum _Screen { splash, onboarding, login, home }
+
 class _SplashWrapperState extends State<SplashWrapper> {
-  bool _showSplash = true;
-  bool _needsOnboarding = false;
-  bool _checkDone = false;
+  _Screen _screen = _Screen.splash;
 
   @override
   void initState() {
@@ -32,31 +38,64 @@ class _SplashWrapperState extends State<SplashWrapper> {
     // Wait minimum splash duration
     await Future.delayed(const Duration(milliseconds: 2600));
 
-    if (mounted) {
-      setState(() {
-        _needsOnboarding = needsOnboarding;
-        _checkDone = true;
-        _showSplash = false;
-      });
+    if (!mounted) return;
+
+    if (needsOnboarding) {
+      setState(() => _screen = _Screen.onboarding);
+      return;
+    }
+
+    await _decideAfterOnboarding();
+  }
+
+  Future<void> _decideAfterOnboarding() async {
+    if (AuthService.isLoggedIn) {
+      // Already logged in — run migration if needed, then go home
+      await MigrationService.migrateIfNeeded();
+      if (mounted) setState(() => _screen = _Screen.home);
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final skipped = prefs.getBool(_kSkipLogin) ?? false;
+    if (skipped) {
+      if (mounted) setState(() => _screen = _Screen.home);
+    } else {
+      if (mounted) setState(() => _screen = _Screen.login);
     }
   }
 
   void _onOnboardingComplete() {
-    setState(() => _needsOnboarding = false);
+    _decideAfterOnboarding();
+  }
+
+  void _onLoginSuccess() {
+    setState(() => _screen = _Screen.home);
+  }
+
+  Future<void> _onSkipLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kSkipLogin, true);
+    if (mounted) setState(() => _screen = _Screen.home);
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 400),
-      child: _showSplash
-          ? const _SplashContent(key: ValueKey('splash'))
-          : _checkDone && _needsOnboarding
-              ? OnboardingPage(
-                  key: const ValueKey('onboarding'),
-                  onComplete: _onOnboardingComplete,
-                )
-              : const MainNavigation(key: ValueKey('home')),
+      child: switch (_screen) {
+        _Screen.splash => const _SplashContent(key: ValueKey('splash')),
+        _Screen.onboarding => OnboardingPage(
+            key: const ValueKey('onboarding'),
+            onComplete: _onOnboardingComplete,
+          ),
+        _Screen.login => LoginPage(
+            key: const ValueKey('login'),
+            onLoginSuccess: _onLoginSuccess,
+            onSkip: _onSkipLogin,
+          ),
+        _Screen.home => const MainNavigation(key: ValueKey('home')),
+      },
     );
   }
 }

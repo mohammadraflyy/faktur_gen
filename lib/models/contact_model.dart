@@ -4,6 +4,7 @@ class ContactModel {
   String npwp;
   String alamat;
   String telepon;
+  String clientCode;
 
   ContactModel({
     required this.id,
@@ -11,6 +12,7 @@ class ContactModel {
     this.npwp = '',
     this.alamat = '',
     this.telepon = '',
+    this.clientCode = '',
   });
 
   bool get isEmpty => nama.trim().isEmpty;
@@ -25,6 +27,7 @@ class ContactModel {
         'npwp': npwp,
         'alamat': alamat,
         'telepon': telepon,
+        'clientCode': clientCode,
       };
 
   factory ContactModel.fromMap(Map<String, dynamic> map) => ContactModel(
@@ -33,5 +36,6 @@ class ContactModel {
         npwp: map['npwp'] as String? ?? '',
         alamat: map['alamat'] as String? ?? '',
         telepon: map['telepon'] as String? ?? '',
+        clientCode: map['clientCode'] as String? ?? '',
       );
 }

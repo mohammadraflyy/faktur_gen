@@ -14,9 +14,11 @@ import '../services/contact_service.dart';
 import '../services/history_service.dart';
 import '../services/pdf_service.dart';
 import '../services/settings_service.dart';
+import '../services/subscription_service.dart';
 import '../services/reminder_service.dart';
 import '../services/template_service.dart';
 import '../models/reminder_model.dart';
+import '../widgets/paywall_sheet.dart';
 import 'pdf_preview_page.dart';
 
 class FakturPage extends StatefulWidget {
@@ -282,9 +284,17 @@ class _FakturPageState extends State<FakturPage> {
     _syncToModel();
     if (!mounted) return;
 
+    // Check usage limit
+    final canCreate = await SubscriptionService.canCreateDocument();
+    if (!canCreate) {
+      if (mounted) showPaywallSheet(context);
+      return;
+    }
+
     final faktur = _faktur;
     final logoBytes = _settings.logoBytes;
     final signatureBytes = _settings.signatureBytes;
+    final isPro = await SubscriptionService.isPro();
 
     // Auto-save kontak baru
     await ContactService.saveIfNotExists(
@@ -324,6 +334,9 @@ class _FakturPageState extends State<FakturPage> {
       currency: faktur.currency,
     ));
 
+    // Track usage
+    await SubscriptionService.incrementDocCount();
+
     _isDirty = false;
     if (!mounted) return;
     await Navigator.push(
@@ -335,7 +348,9 @@ class _FakturPageState extends State<FakturPage> {
           buildPdf: (format) => PdfService.buildBytes(faktur, format,
               logoBytes: logoBytes,
               signatureBytes: signatureBytes,
-              templateConfig: _settings.templateConfig),
+              templateConfig: _settings.templateConfig,
+              showWatermark: !isPro,
+              qrisMerchantId: isPro ? _settings.qrisMerchantId : null),
         ),
       ),
     );

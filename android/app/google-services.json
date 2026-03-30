@@ -1,0 +1,82 @@
+{
+  "project_info": {
+    "project_number": "676752067338",
+    "project_id": "faktura-82ba8",
+    "storage_bucket": "faktura-82ba8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:676752067338:android:31072609f3853aa43b08f3",
+        "android_client_info": {
+          "package_name": "com.example.faktur_gen"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "676752067338-ept81h6glupmvjg193meuv8m5die6kle.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDeO-1sxSnJYjXV8Tbs8pkF8e7LH4iUbmI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "676752067338-ept81h6glupmvjg193meuv8m5die6kle.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "676752067338-kpnm3iuq32390emiih6motqtavd1vqgc.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.fakturGen"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:676752067338:android:92889718afe798163b08f3",
+        "android_client_info": {
+          "package_name": "com.faktura"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "676752067338-ept81h6glupmvjg193meuv8m5die6kle.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDeO-1sxSnJYjXV8Tbs8pkF8e7LH4iUbmI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "676752067338-ept81h6glupmvjg193meuv8m5die6kle.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "676752067338-kpnm3iuq32390emiih6motqtavd1vqgc.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.fakturGen"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

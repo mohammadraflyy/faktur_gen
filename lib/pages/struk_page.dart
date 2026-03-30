@@ -14,6 +14,8 @@ import '../services/history_service.dart';
 import '../services/reminder_service.dart';
 import '../services/settings_service.dart';
 import '../services/struk_pdf_service.dart';
+import '../services/subscription_service.dart';
+import '../widgets/paywall_sheet.dart';
 import 'pdf_preview_page.dart';
 
 class StrukPage extends StatefulWidget {
@@ -309,8 +311,16 @@ class _StrukPageState extends State<StrukPage> {
     }
     if (!mounted) return;
 
+    // Check usage limit
+    final canCreate = await SubscriptionService.canCreateDocument();
+    if (!canCreate) {
+      if (mounted) showPaywallSheet(context);
+      return;
+    }
+
     final struk = _struk;
     final logoBytes = _settings.logoBytes;
+    final isPro = await SubscriptionService.isPro();
     const struklFormat = PdfPageFormat(226.77, double.infinity, marginAll: 12);
 
     await HistoryService.add(HistoryEntry(
@@ -341,6 +351,9 @@ class _StrukPageState extends State<StrukPage> {
       kembalian: struk.kembalian,
     ));
 
+    // Track usage
+    await SubscriptionService.incrementDocCount();
+
     _isDirty = false;
     if (!mounted) return;
     await Navigator.push(
@@ -354,7 +367,8 @@ class _StrukPageState extends State<StrukPage> {
                   logoBytes: logoBytes,
                   currencySymbol: _settings.currencySymbol,
                   currencyLocale: _settings.currencyLocale,
-                  templateConfig: _settings.templateConfig),
+                  templateConfig: _settings.templateConfig,
+                  showWatermark: !isPro),
           initialPageFormat: struklFormat,
           canChangePageFormat: false,
         ),

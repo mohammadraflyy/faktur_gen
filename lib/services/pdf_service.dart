@@ -58,6 +58,8 @@ class PdfService {
     bool isPaid = false,
     bool showQr = false,
     DocTemplateConfig? templateConfig,
+    bool showWatermark = false,
+    String? qrisMerchantId,
   }) async =>
       _buildDocument(faktur,
               format: format,
@@ -65,7 +67,9 @@ class PdfService {
               signatureBytes: signatureBytes,
               isPaid: isPaid,
               showQr: showQr,
-              tpl: templateConfig)
+              tpl: templateConfig,
+              showWatermark: showWatermark,
+              qrisMerchantId: qrisMerchantId)
           .save();
 
   static Future<void> print(FakturModel faktur, {Uint8List? logoBytes}) async {
@@ -93,6 +97,8 @@ class PdfService {
     bool isPaid = false,
     bool showQr = false,
     DocTemplateConfig? tpl,
+    bool showWatermark = false,
+    String? qrisMerchantId,
   }) {
     final showLogo = tpl?.showLogo ?? true;
     final showSig = tpl?.showSignature ?? true;
@@ -133,6 +139,35 @@ class PdfService {
             pw.SizedBox(height: 24),
           ],
           _footer(faktur, signatureBytes: showSig ? signatureBytes : null, tpl: tpl),
+          if (qrisMerchantId != null && qrisMerchantId.isNotEmpty) ...[
+            pw.SizedBox(height: 16),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.end,
+              children: [
+                pw.Column(
+                  children: [
+                    pw.Text('Scan QRIS', style: const pw.TextStyle(fontSize: 8, color: _textGrey)),
+                    pw.SizedBox(height: 4),
+                    pw.BarcodeWidget(
+                      barcode: pw.Barcode.qrCode(),
+                      data: qrisMerchantId,
+                      width: 80,
+                      height: 80,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+          if (showWatermark) ...[
+            pw.SizedBox(height: 16),
+            pw.Center(
+              child: pw.Text(
+                'Made with Faktura',
+                style: pw.TextStyle(fontSize: 8, color: PdfColors.grey400),
+              ),
+            ),
+          ],
         ];
         },
       ),

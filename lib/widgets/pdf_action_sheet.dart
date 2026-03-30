@@ -1,25 +1,27 @@
 import 'package:flutter/material.dart';
 
-enum PdfAction { print, download }
+enum PdfAction { print, download, whatsapp }
 
-/// Tampilkan bottom sheet pilihan Print / Download.
+/// Tampilkan bottom sheet pilihan Print / Download / WhatsApp.
 /// Mengembalikan [PdfAction] yang dipilih, atau null jika dibatalkan.
 Future<PdfAction?> showPdfActionSheet(
   BuildContext context, {
   required String docName,
+  bool showWhatsApp = false,
 }) {
   return showModalBottomSheet<PdfAction>(
     context: context,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (_) => _PdfActionSheet(docName: docName),
+    builder: (_) => _PdfActionSheet(docName: docName, showWhatsApp: showWhatsApp),
   );
 }
 
 class _PdfActionSheet extends StatelessWidget {
   final String docName;
-  const _PdfActionSheet({required this.docName});
+  final bool showWhatsApp;
+  const _PdfActionSheet({required this.docName, this.showWhatsApp = false});
 
   @override
   Widget build(BuildContext context) {
@@ -71,6 +73,18 @@ class _PdfActionSheet extends StatelessWidget {
                     onTap: () => Navigator.pop(context, PdfAction.download),
                   ),
                 ),
+                if (showWhatsApp) ...[
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _ActionTile(
+                      icon: Icons.chat,
+                      label: 'WhatsApp',
+                      sublabel: 'Kirim ke klien',
+                      color: const Color(0xFF25D366),
+                      onTap: () => Navigator.pop(context, PdfAction.whatsapp),
+                    ),
+                  ),
+                ],
               ],
             ),
           ],

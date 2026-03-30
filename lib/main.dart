@@ -1,9 +1,16 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'firebase_options.dart';
 import 'pages/splash_page.dart';
+import 'services/auth_service.dart';
 import 'services/backup_service.dart';
+import 'services/billing_service.dart';
+import 'services/recurring_invoice_service.dart';
+import 'services/subscription_service.dart';
 import 'services/notification_service.dart';
 import 'services/reminder_service.dart';
 import 'services/locale_service.dart';
@@ -19,6 +26,21 @@ void main() async {
     await LocaleService.load();
   } catch (e) {
     debugPrint('[main] Pre-init error (non-fatal): $e');
+  }
+
+  // Firebase initialization
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+    );
+    AuthService.init();
+    BillingService.init();
+  } catch (e) {
+    debugPrint('[main] Firebase init error (non-fatal): $e');
   }
 
   runApp(const MyApp());
@@ -38,6 +60,16 @@ void main() async {
     // Auto-backup (silent, won't block UI)
     BackupService.autoBackupIfNeeded().then((did) {
       if (did) debugPrint('[main] Auto-backup completed');
+    });
+    // Check recurring invoices (Pro only, silent)
+    SubscriptionService.isPro().then((isPro) {
+      if (isPro) {
+        RecurringInvoiceService.checkAndGenerate().then((generated) {
+          if (generated.isNotEmpty) {
+            debugPrint('[main] Generated ${generated.length} recurring invoices');
+          }
+        });
+      }
     });
   } catch (e) {
     debugPrint('[main] Post-init error (non-fatal): $e');
@@ -101,7 +133,7 @@ class MyApp extends StatelessWidget {
         );
         return ValueListenableBuilder<AppLanguage>(
           valueListenable: LocaleService.languageNotifier,
-          builder: (context, _, __) => MaterialApp(
+          builder: (context, _, _) => MaterialApp(
           navigatorKey: navigatorKey,
           title: 'Faktura',
           debugShowCheckedModeBanner: false,

@@ -34,13 +34,14 @@ class StrukPdfService {
     String currencySymbol = 'Rp ',
     String currencyLocale = 'id_ID',
     DocTemplateConfig? templateConfig,
+    bool showWatermark = false,
   }) async {
     _initCurrency(currencySymbol: currencySymbol, currencyLocale: currencyLocale);
-    return _buildDocument(struk, logoBytes: logoBytes, tpl: templateConfig).save();
+    return _buildDocument(struk, logoBytes: logoBytes, tpl: templateConfig, showWatermark: showWatermark).save();
   }
 
   static pw.Document _buildDocument(StrukModel struk,
-      {Uint8List? logoBytes, DocTemplateConfig? tpl}) {
+      {Uint8List? logoBytes, DocTemplateConfig? tpl, bool showWatermark = false}) {
     final isCompact = (tpl?.strukTemplate ?? StrukTemplate.standard) == StrukTemplate.compact;
     final showLogo = tpl?.showLogo ?? true;
     final pdf = pw.Document();
@@ -71,6 +72,15 @@ class StrukPdfService {
             if (struk.catatan.isNotEmpty) ...[
               _dashedLine(),
               _buildCatatan(struk),
+            ],
+            if (showWatermark) ...[
+              pw.SizedBox(height: 8),
+              pw.Center(
+                child: pw.Text(
+                  'Made with Faktura',
+                  style: pw.TextStyle(fontSize: 6, color: PdfColors.grey400),
+                ),
+              ),
             ],
           ],
         ),

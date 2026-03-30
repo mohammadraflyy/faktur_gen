@@ -5,13 +5,18 @@ import 'package:image_picker/image_picker.dart';
 import '../main.dart';
 import '../models/doc_template_config.dart';
 import '../models/settings_model.dart';
+import '../models/subscription_model.dart';
+import '../services/auth_service.dart';
 import '../services/backup_service.dart';
 import '../services/notification_service.dart';
 import '../services/reminder_service.dart';
 import '../services/locale_service.dart';
 import '../services/settings_service.dart';
+import '../services/subscription_service.dart';
 import '../services/theme_service.dart';
+import '../widgets/paywall_sheet.dart';
 import '../widgets/signature_pad.dart';
+import 'recurring_invoice_page.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Settings Hub — menu list that navigates to sub-pages
@@ -26,6 +31,7 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   SettingsModel _settings = SettingsModel();
+  SubscriptionModel _sub = SubscriptionModel();
   bool _isLoading = true;
 
   @override
@@ -36,7 +42,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _load() async {
     final s = await SettingsService.load();
-    if (mounted) setState(() { _settings = s; _isLoading = false; });
+    final sub = await SubscriptionService.load();
+    if (mounted) setState(() { _settings = s; _sub = sub; _isLoading = false; });
   }
 
   Future<void> _push(Widget page) async {
@@ -60,6 +67,9 @@ class _SettingsPageState extends State<SettingsPage> {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
+          // Subscription
+          _buildSubscriptionCard(theme),
+          const SizedBox(height: 16),
           // Profile header
           _buildProfileHeader(theme),
           const SizedBox(height: 16),
@@ -126,6 +136,33 @@ class _SettingsPageState extends State<SettingsPage> {
             subtitle: _settings.hasSignature ? tr('settings.already_set') : tr('settings.not_set'),
             onTap: () => _push(_SignatureSubPage(settings: _settings)),
           ),
+          _menuTile(
+            theme,
+            icon: Icons.qr_code_2_rounded,
+            title: tr('settings.qris'),
+            subtitle: _settings.qrisMerchantId.isNotEmpty
+                ? tr('settings.already_set')
+                : tr('settings.not_set'),
+            onTap: () {
+              if (!_sub.isPro) { showPaywallSheet(context); return; }
+              _push(_QrisSubPage(settings: _settings));
+            },
+            trailing: _sub.isPro ? null : _proBadge(theme),
+          ),
+          _menuTile(
+            theme,
+            icon: Icons.repeat_rounded,
+            title: tr('recurring.title'),
+            subtitle: tr('recurring.subtitle'),
+            onTap: () {
+              if (!_sub.isPro) { showPaywallSheet(context); return; }
+              _push(const RecurringInvoicePage());
+            },
+            trailing: _sub.isPro ? null : _proBadge(theme),
+          ),
+          const SizedBox(height: 8),
+          _sectionLabel(theme, tr('auth.account')),
+          _buildAccountTile(theme),
           const SizedBox(height: 8),
           _sectionLabel(theme, tr('settings.app')),
           _buildThemeTile(theme),
@@ -214,6 +251,140 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _proBadge(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFA000).withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text('PRO',
+        style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700,
+          color: const Color(0xFFFFA000))),
+    );
+  }
+
+  Widget _buildSubscriptionCard(ThemeData theme) {
+    final isPro = _sub.isPro;
+    final remaining = SubscriptionService.freeMonthlyLimit - _sub.monthlyDocCount;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Card(
+        child: InkWell(
+          onTap: isPro ? null : () => showPaywallSheet(context).then((_) => _load()),
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 44, height: 44,
+                  decoration: BoxDecoration(
+                    color: isPro
+                        ? const Color(0xFFFFA000).withValues(alpha: 0.15)
+                        : theme.colorScheme.primary.withValues(alpha: 0.08),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isPro ? Icons.workspace_premium_rounded : Icons.star_outline_rounded,
+                    color: isPro ? const Color(0xFFFFA000) : theme.colorScheme.primary,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isPro ? tr('sub.pro') : tr('sub.free'),
+                        style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.onSurface),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        isPro
+                            ? tr('sub.unlimited')
+                            : '$remaining ${tr('sub.docs_remaining')}',
+                        style: GoogleFonts.inter(fontSize: 12,
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+                      ),
+                    ],
+                  ),
+                ),
+                if (!isPro)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFA000),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(tr('sub.upgrade'),
+                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600,
+                        color: Colors.white)),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAccountTile(ThemeData theme) {
+    final user = AuthService.currentUser;
+    if (user != null) {
+      return _menuTile(
+        theme,
+        icon: Icons.account_circle_outlined,
+        title: user.displayName ?? user.email ?? tr('auth.account'),
+        subtitle: user.email ?? '',
+        onTap: () async {
+          final confirm = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: Text(tr('auth.sign_out_confirm')),
+              content: Text(tr('auth.sign_out_warn')),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: Text(tr('common.cancel')),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: Text(tr('auth.sign_out')),
+                ),
+              ],
+            ),
+          );
+          if (confirm == true) {
+            await AuthService.signOut();
+            if (mounted) setState(() {});
+          }
+        },
+      );
+    }
+    return _menuTile(
+      theme,
+      icon: Icons.login_rounded,
+      title: tr('auth.sign_in'),
+      subtitle: tr('auth.not_signed_in'),
+      onTap: () async {
+        try {
+          await AuthService.signInWithGoogle();
+          if (mounted) setState(() {});
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('${tr('auth.sign_in_failed')}: $e')),
+            );
+          }
+        }
+      },
     );
   }
 
@@ -464,6 +635,7 @@ class _SettingsPageState extends State<SettingsPage> {
     required String title,
     required String subtitle,
     required VoidCallback onTap,
+    Widget? trailing,
   }) {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 20),
@@ -494,7 +666,7 @@ class _SettingsPageState extends State<SettingsPage> {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: Icon(Icons.chevron_right_rounded,
+      trailing: trailing ?? Icon(Icons.chevron_right_rounded,
           size: 20,
           color: theme.colorScheme.onSurface.withValues(alpha: 0.25)),
       onTap: onTap,
@@ -2015,5 +2187,81 @@ class _BankCtrls {
     bankCtrl.dispose();
     nomorCtrl.dispose();
     pemilikCtrl.dispose();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// QRIS Settings Sub-page
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class _QrisSubPage extends StatefulWidget {
+  final SettingsModel settings;
+  const _QrisSubPage({required this.settings});
+
+  @override
+  State<_QrisSubPage> createState() => _QrisSubPageState();
+}
+
+class _QrisSubPageState extends State<_QrisSubPage> {
+  late final TextEditingController _qrisCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _qrisCtrl = TextEditingController(text: widget.settings.qrisMerchantId);
+  }
+
+  @override
+  void dispose() {
+    _qrisCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    widget.settings.qrisMerchantId = _qrisCtrl.text.trim();
+    await SettingsService.save(widget.settings);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(tr('settings.saved'))),
+      );
+      Navigator.pop(context);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(tr('settings.qris')),
+        actions: [
+          TextButton(
+            onPressed: _save,
+            child: Text(tr('settings.save')),
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Text(
+            tr('settings.qris_desc'),
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 20),
+          TextFormField(
+            controller: _qrisCtrl,
+            decoration: InputDecoration(
+              labelText: tr('settings.qris_id'),
+              prefixIcon: const Icon(Icons.qr_code_2_rounded, size: 20),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
