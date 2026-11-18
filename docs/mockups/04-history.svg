@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="884" viewBox="0 0 820 884" font-family="Inter, 'Segoe UI', sans-serif">
+  <rect width="820" height="884" fill="#E5E7EB"/>
+  <defs><clipPath id="ph"><rect width="390" height="844" rx="36"/></clipPath></defs>
+  <g transform="translate(20,20)" clip-path="url(#ph)">
+    <rect width="390" height="844" fill="#FFFFFF"/>
+    <text x="24" y="30" font-size="13" font-weight="600" fill="#111827">9:41</text>
+    <text x="20" y="100" font-size="22" font-weight="700" fill="#111827">Riwayat</text>
+    <text x="370" y="100" text-anchor="end" font-size="14" font-weight="600" fill="#2563EB">Ekspor</text>
+
+    <rect x="20" y="120" width="350" height="48" rx="12" fill="#F3F4F6"/>
+    <circle cx="44" cy="142" r="7" fill="none" stroke="#4B5563" stroke-width="2"/><path d="M49 147 l5 5" stroke="#4B5563" stroke-width="2"/>
+    <text x="64" y="149" font-size="15" fill="#4B5563">Cari klien atau nomor</text>
+
+    <g font-size="14" font-weight="600">
+      <text x="20" y="208" fill="#111827">Semua</text>
+      <rect x="20" y="216" width="48" height="2" fill="#111827"/>
+      <text x="92" y="208" fill="#6B7280">Invoice</text>
+      <text x="170" y="208" fill="#6B7280">Struk</text>
+      <text x="234" y="208" fill="#6B7280">Belum dibayar</text>
+    </g>
+    <line x1="0" y1="218" x2="390" y2="218" stroke="#F0F1F3"/>
+
+    <text x="20" y="256" font-size="13" fill="#6B7280">Hari ini</text>
+    <text x="20" y="290" font-size="15" font-weight="600" fill="#111827">Klien A</text>
+    <text x="20" y="310" font-size="13" fill="#6B7280">INV-2026-0013</text>
+    <text x="370" y="290" text-anchor="end" font-size="15" fill="#111827">Rp 3.330.000</text>
+    <circle cx="276" cy="306" r="3.5" fill="#B45309"/><text x="370" y="310" text-anchor="end" font-size="13" font-weight="600" fill="#B45309">Belum dibayar</text>
+    <line x1="20" y1="328" x2="370" y2="328" stroke="#F0F1F3"/>
+    <text x="20" y="360" font-size="15" font-weight="600" fill="#111827">Pelanggan umum</text>
+    <text x="20" y="380" font-size="13" fill="#6B7280">Struk STR-0451 · Tunai</text>
+    <text x="370" y="360" text-anchor="end" font-size="15" fill="#111827">Rp 85.000</text>
+    <circle cx="324" cy="376" r="3.5" fill="#047857"/><text x="370" y="380" text-anchor="end" font-size="13" font-weight="600" fill="#047857">Lunas</text>
+
+    <text x="20" y="432" font-size="13" fill="#6B7280">Kemarin</text>
+    <text x="20" y="466" font-size="15" font-weight="600" fill="#111827">Klien B</text>
+    <text x="20" y="486" font-size="13" fill="#6B7280">INV-2026-0009</text>
+    <text x="370" y="466" text-anchor="end" font-size="15" fill="#111827">Rp 1.750.000</text>
+    <circle cx="288" cy="482" r="3.5" fill="#B91C1C"/><text x="370" y="486" text-anchor="end" font-size="13" font-weight="600" fill="#B91C1C">Lewat 2 hari</text>
+    <line x1="20" y1="504" x2="370" y2="504" stroke="#F0F1F3"/>
+
+    <rect x="0" y="505" width="390" height="70" fill="#B91C1C"/>
+    <text x="366" y="545" text-anchor="end" font-size="14" font-weight="600" fill="#FFFFFF">Hapus</text>
+    <rect x="-80" y="505" width="370" height="70" fill="#FFFFFF"/>
+    <text x="4" y="536" font-size="15" font-weight="600" fill="#111827">en C</text>
+    <text x="4" y="556" font-size="13" fill="#6B7280">-2026-0008</text>
+    <text x="270" y="536" text-anchor="end" font-size="15" fill="#111827">Rp 2.100.000</text>
+
+    <rect x="20" y="690" width="350" height="52" rx="12" fill="#1F2937"/>
+    <text x="36" y="721" font-size="14" fill="#F9FAFB">Invoice dihapus</text>
+    <text x="354" y="721" text-anchor="end" font-size="14" font-weight="600" fill="#93C5FD">Urungkan</text>
+
+    <rect x="0" y="764" width="390" height="80" fill="#FFFFFF"/>
+    <line x1="0" y1="764" x2="390" y2="764" stroke="#F0F1F3"/>
+    <rect x="94" y="776" width="56" height="32" rx="16" fill="#EFF6FF"/>
+    <g fill="none" stroke="#374151" stroke-width="1.8" stroke-linejoin="round">
+      <path d="M41 800 v-10 l9 -7 l9 7 v10 z"/>
+      <circle cx="122" cy="792" r="9" fill="#2563EB" stroke="#2563EB"/><path d="M122 787 v5 l4 3" stroke="#FFFFFF"/>
+      <path d="M260 800 h16 l-3 -4 v-6 a5 5 0 0 0 -10 0 v6 z"/>
+      <circle cx="342" cy="792" r="3.5"/><circle cx="342" cy="792" r="9"/>
+    </g>
+    <g font-size="12" text-anchor="middle">
+      <text x="50" y="828" fill="#374151">Beranda</text>
+      <text x="122" y="828" font-weight="600" fill="#1D4ED8">Riwayat</text>
+      <text x="268" y="828" fill="#374151">Pengingat</text>
+      <text x="342" y="828" fill="#374151">Pengaturan</text>
+      <text x="195" y="832" fill="#374151">Buat</text>
+    </g>
+    <rect x="167" y="770" width="56" height="44" rx="14" fill="#2563EB"/>
+    <path d="M195 782 v20 M185 792 h20" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round"/>
+  </g>
+
+  <g font-size="13" fill="#111827">
+    <text x="440" y="60" font-size="18" font-weight="700">04 · Riwayat</text>
+    <text x="440" y="84" fill="#374151">Temukan dokumen dan statusnya.</text>
+    <text x="440" y="124" font-weight="600">Daftar polos, bukan kartu</text>
+    <text x="440" y="144" fill="#374151">Klien jadi judul; status = titik + teks</text>
+    <text x="440" y="162" fill="#374151">di bawah nominal.</text>
+    <text x="440" y="202" font-weight="600">Filter jadi tab bergaris bawah</text>
+    <text x="440" y="222" fill="#374151">Tinggi area sentuh 48dp; lebih tenang dari chip.</text>
+    <text x="440" y="262" font-weight="600">Geser hapus + Urungkan (4 detik)</text>
+    <text x="440" y="282" fill="#374151">Baris mengecil 200ms; daftar menutup rapat.</text>
+    <text x="440" y="322" font-weight="600">Swipe antar tab dimatikan</text>
+    <text x="440" y="342" fill="#374151">Sekarang hanya tab Pengingat yang dimatikan</text>
+    <text x="440" y="360" fill="#374151">(main_navigation.dart:26); di Riwayat geser</text>
+    <text x="440" y="378" fill="#374151">ganti tab berebut dengan geser hapus.</text>
+    <text x="440" y="418" font-weight="600">Kosong / gagal</text>
+    <text x="440" y="438" fill="#374151">"Tidak ada invoice belum dibayar" + Hapus filter.</text>
+    <text x="440" y="456" fill="#374151">"Riwayat tidak bisa dimuat" + Coba lagi.</text>
+    <text x="440" y="840" font-size="12" fill="#6B7280">Nama dan angka: data contoh.</text>
+  </g>
+</svg>

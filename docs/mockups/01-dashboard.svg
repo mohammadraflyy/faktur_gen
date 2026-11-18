@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="884" viewBox="0 0 820 884" font-family="Inter, 'Segoe UI', sans-serif">
+  <rect width="820" height="884" fill="#E5E7EB"/>
+  <defs><clipPath id="ph"><rect width="390" height="844" rx="36"/></clipPath></defs>
+  <g transform="translate(20,20)" clip-path="url(#ph)">
+    <rect width="390" height="844" fill="#FFFFFF"/>
+    <text x="24" y="30" font-size="13" font-weight="600" fill="#111827">9:41</text>
+
+    <text x="20" y="80" font-size="13" fill="#6B7280">Rabu, 19 November</text>
+    <text x="20" y="106" font-size="22" font-weight="700" fill="#111827">Nama Toko Anda</text>
+
+    <text x="20" y="160" font-size="13" fill="#6B7280">Belum dibayar</text>
+    <text x="20" y="200" font-size="32" font-weight="700" fill="#111827">Rp 12.450.000</text>
+    <text x="20" y="226" font-size="13" fill="#6B7280">4 invoice ·</text>
+    <text x="92" y="226" font-size="13" font-weight="600" fill="#B91C1C">2 lewat jatuh tempo</text>
+
+    <line x1="20" y1="256" x2="370" y2="256" stroke="#F0F1F3"/>
+    <text x="20" y="286" font-size="15" font-weight="600" fill="#111827">Klien A</text>
+    <text x="20" y="306" font-size="13" fill="#6B7280">INV-0012 ·</text>
+    <text x="88" y="306" font-size="13" font-weight="600" fill="#B91C1C">lewat 5 hari</text>
+    <text x="370" y="286" text-anchor="end" font-size="15" font-weight="600" fill="#111827">Rp 3.200.000</text>
+    <line x1="20" y1="324" x2="370" y2="324" stroke="#F0F1F3"/>
+    <text x="20" y="354" font-size="15" font-weight="600" fill="#111827">Klien B</text>
+    <text x="20" y="374" font-size="13" fill="#6B7280">INV-0009 ·</text>
+    <text x="88" y="374" font-size="13" font-weight="600" fill="#B91C1C">lewat 2 hari</text>
+    <text x="370" y="354" text-anchor="end" font-size="15" font-weight="600" fill="#111827">Rp 1.750.000</text>
+    <line x1="20" y1="392" x2="370" y2="392" stroke="#F0F1F3"/>
+    <text x="20" y="424" font-size="14" font-weight="600" fill="#2563EB">Lihat semua (4)</text>
+
+    <text x="20" y="490" font-size="17" font-weight="600" fill="#111827">November</text>
+    <text x="20" y="522" font-size="22" font-weight="700" fill="#111827">Rp 8.900.000</text>
+    <text x="20" y="546" font-size="13" fill="#6B7280">masuk · Oktober Rp 7.200.000</text>
+    <g fill="#E5E7EB">
+      <rect x="234" y="512" width="16" height="22" rx="3"/><rect x="256" y="504" width="16" height="30" rx="3"/><rect x="278" y="516" width="16" height="18" rx="3"/>
+      <rect x="300" y="500" width="16" height="34" rx="3"/><rect x="322" y="496" width="16" height="38" rx="3"/>
+    </g>
+    <rect x="344" y="488" width="16" height="46" rx="3" fill="#2563EB"/>
+    <text x="297" y="556" text-anchor="middle" font-size="12" fill="#6B7280">6 bulan</text>
+
+    <line x1="20" y1="590" x2="370" y2="590" stroke="#F0F1F3"/>
+    <text x="20" y="628" font-size="15" fill="#111827">Pengingat: Klien C</text>
+    <text x="370" y="628" text-anchor="end" font-size="13" fill="#6B7280">21 Nov</text>
+    <line x1="20" y1="652" x2="370" y2="652" stroke="#F0F1F3"/>
+
+    <rect x="0" y="764" width="390" height="80" fill="#FFFFFF"/>
+    <line x1="0" y1="764" x2="390" y2="764" stroke="#F0F1F3"/>
+    <rect x="22" y="776" width="56" height="32" rx="16" fill="#EFF6FF"/>
+    <g fill="none" stroke="#374151" stroke-width="1.8" stroke-linejoin="round">
+      <path d="M41 800 v-10 l9 -7 l9 7 v10 z" fill="#2563EB" stroke="#2563EB"/>
+      <circle cx="122" cy="792" r="9"/><path d="M122 787 v5 l4 3"/>
+      <path d="M260 800 h16 l-3 -4 v-6 a5 5 0 0 0 -10 0 v6 z"/>
+      <circle cx="342" cy="792" r="3.5"/><circle cx="342" cy="792" r="9"/>
+    </g>
+    <g font-size="12" text-anchor="middle">
+      <text x="50" y="828" font-weight="600" fill="#1D4ED8">Beranda</text>
+      <text x="122" y="828" fill="#374151">Riwayat</text>
+      <text x="268" y="828" fill="#374151">Pengingat</text>
+      <text x="342" y="828" fill="#374151">Pengaturan</text>
+    </g>
+    <rect x="167" y="770" width="56" height="44" rx="14" fill="#2563EB"/>
+    <path d="M195 782 v20 M185 792 h20" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round"/>
+    <text x="195" y="832" text-anchor="middle" font-size="12" fill="#374151">Buat</text>
+  </g>
+
+  <g font-size="13" fill="#111827">
+    <text x="440" y="60" font-size="18" font-weight="700">01 · Beranda</text>
+    <text x="440" y="84" fill="#374151">Satu pertanyaan: siapa yang belum bayar?</text>
+    <text x="440" y="124" font-weight="600">Tanpa kartu</text>
+    <text x="440" y="144" fill="#374151">Bagian dipisah jarak 40 + garis 1px.</text>
+    <text x="440" y="162" fill="#374151">Dulu: 6–9 kartu bergaris di satu layar.</text>
+    <text x="440" y="202" font-weight="600">Satu angka besar</text>
+    <text x="440" y="222" fill="#374151">Total belum dibayar; "lewat jatuh tempo"</text>
+    <text x="440" y="240" fill="#374151">satu-satunya teks merah di layar.</text>
+    <text x="440" y="280" font-weight="600">Grafik jadi mini bar 6 bulan</text>
+    <text x="440" y="300" fill="#374151">Cukup untuk lihat tren; tap untuk detail.</text>
+    <text x="440" y="340" font-weight="600">Nav bawah tenang</text>
+    <text x="440" y="360" fill="#374151">Ikon garis, aktif = ikon terisi + label biru.</text>
+    <text x="440" y="378" fill="#374151">"Buat" kotak membulat, bukan lingkaran besar.</text>
+    <text x="440" y="418" font-weight="600">Kosong / gagal</text>
+    <text x="440" y="438" fill="#374151">"Belum ada invoice" + Buat invoice.</text>
+    <text x="440" y="456" fill="#374151">"Data tidak bisa dimuat" + Coba lagi.</text>
+    <text x="440" y="840" font-size="12" fill="#6B7280">Angka dan nama: data contoh.</text>
+  </g>
+</svg>

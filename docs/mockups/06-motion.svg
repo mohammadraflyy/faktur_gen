@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="820" viewBox="0 0 900 820" font-family="Inter, 'Segoe UI', sans-serif">
+  <rect width="900" height="820" fill="#FFFFFF"/>
+  <text x="40" y="56" font-size="24" font-weight="700" fill="#111827">06 · Gerak dan kehalusan</text>
+  <text x="40" y="82" font-size="14" fill="#6B7280">Gerak hanya untuk menjelaskan perubahan. Pendek (150–300ms), satu kurva, tanpa loop. Semua bawaan Flutter, tanpa package baru.</text>
+
+  <g font-size="13" fill="#6B7280" font-weight="600">
+    <text x="40" y="130">Momen</text><text x="270" y="130">Gerak</text><text x="560" y="130">Durasi</text><text x="650" y="130">Cara (bawaan Flutter)</text>
+  </g>
+  <line x1="40" y1="142" x2="860" y2="142" stroke="#E5E7EB"/>
+
+  <g font-size="14" fill="#111827">
+    <text x="40" y="176" font-weight="600">Pindah tab</text>
+    <text x="270" y="176">Fade, isi baru naik 8px</text><text x="560" y="176">200ms</text><text x="650" y="176" font-size="13" fill="#374151">AnimatedSwitcher; swipe mati</text>
+    <line x1="40" y1="196" x2="860" y2="196" stroke="#F0F1F3"/>
+
+    <text x="40" y="228" font-weight="600">Buka halaman</text>
+    <text x="270" y="228">Fade maju</text><text x="560" y="228">300ms</text><text x="650" y="228" font-size="13" fill="#374151">FadeForwardsPageTransitions-</text>
+    <text x="650" y="246" font-size="13" fill="#374151">Builder di pageTransitionsTheme</text>
+    <line x1="40" y1="262" x2="860" y2="262" stroke="#F0F1F3"/>
+
+    <text x="40" y="294" font-weight="600">Sheet</text>
+    <text x="270" y="294">Naik dari bawah, tarik untuk tutup</text><text x="560" y="294">250ms</text><text x="650" y="294" font-size="13" fill="#374151">showModalBottomSheet bawaan</text>
+    <line x1="40" y1="314" x2="860" y2="314" stroke="#F0F1F3"/>
+
+    <text x="40" y="346" font-weight="600">Tambah / hapus item</text>
+    <text x="270" y="346">Baris membuka / menutup tinggi</text><text x="560" y="346">200ms</text><text x="650" y="346" font-size="13" fill="#374151">AnimatedList + SizeTransition</text>
+    <line x1="40" y1="366" x2="860" y2="366" stroke="#F0F1F3"/>
+
+    <text x="40" y="398" font-weight="600">Total berubah</text>
+    <text x="270" y="398">Fade silang angka</text><text x="560" y="398">150ms</text><text x="650" y="398" font-size="13" fill="#374151">AnimatedSwitcher</text>
+    <line x1="40" y1="418" x2="860" y2="418" stroke="#F0F1F3"/>
+
+    <text x="40" y="450" font-weight="600">Buat PDF</text>
+    <text x="270" y="450">Tombol jadi "Membuat…" + spinner kecil</text><text x="560" y="450">s.d. selesai</text><text x="650" y="450" font-size="13" fill="#374151">Tombol disabled, layar tetap</text>
+    <line x1="40" y1="470" x2="860" y2="470" stroke="#F0F1F3"/>
+
+    <text x="40" y="502" font-weight="600">PDF jadi</text>
+    <text x="270" y="502">Centang scale 0.8→1 + haptic ringan</text><text x="560" y="502">200ms</text><text x="650" y="502" font-size="13" fill="#374151">ScaleTransition, HapticFeedback</text>
+    <line x1="40" y1="522" x2="860" y2="522" stroke="#F0F1F3"/>
+
+    <text x="40" y="554" font-weight="600">Memuat daftar</text>
+    <text x="270" y="554">Kosong 300ms pertama, lalu teks</text><text x="560" y="554">—</text><text x="650" y="554" font-size="13" fill="#374151">Hindari kedip spinner singkat</text>
+    <line x1="40" y1="574" x2="860" y2="574" stroke="#F0F1F3"/>
+  </g>
+
+  <text x="40" y="626" font-size="15" font-weight="600" fill="#111827">Kurva: Easing.emphasizedDecelerate untuk masuk, emphasizedAccelerate untuk keluar.</text>
+  <text x="40" y="652" font-size="14" fill="#374151">Pengguna dengan "hapus animasi" di sistem: MediaQuery.disableAnimationsOf(context) → durasi 0.</text>
+
+  <text x="40" y="704" font-size="15" font-weight="600" fill="#111827">Kehalusan bukan hanya animasi: kurangi kerja per frame</text>
+  <g font-size="14" fill="#374151">
+    <text x="40" y="730">• Form invoice: tiap ketik qty/harga memanggil setState untuk seluruh halaman (faktur_page.dart:987).</text>
+    <text x="40" y="752">  Ganti dengan ValueNotifier per baris + total. Dugaan sumber patah-patah; ukur dulu dengan DevTools.</text>
+    <text x="40" y="774">• Daftar Riwayat: ListView.builder; logo toko di-cache sekali.</text>
+    <text x="40" y="796">• Ukur sebelum dan sesudah: profile mode, frame &gt; 16ms di form 10 item.</text>
+  </g>
+</svg>

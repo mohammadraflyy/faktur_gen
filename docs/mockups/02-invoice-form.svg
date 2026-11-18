@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="884" viewBox="0 0 820 884" font-family="Inter, 'Segoe UI', sans-serif">
+  <rect width="820" height="884" fill="#E5E7EB"/>
+  <defs><clipPath id="ph"><rect width="390" height="844" rx="36"/></clipPath></defs>
+  <g transform="translate(20,20)" clip-path="url(#ph)">
+    <rect width="390" height="844" fill="#FFFFFF"/>
+    <text x="24" y="30" font-size="13" font-weight="600" fill="#111827">9:41</text>
+    <path d="M30 76 l-8 8 l8 8" fill="none" stroke="#111827" stroke-width="2"/>
+    <g fill="#111827"><circle cx="362" cy="78" r="2"/><circle cx="362" cy="86" r="2"/><circle cx="362" cy="94" r="2"/></g>
+
+    <text x="20" y="140" font-size="22" font-weight="700" fill="#111827">Invoice baru</text>
+    <text x="20" y="164" font-size="13" fill="#6B7280">INV-2026-0013</text>
+
+    <text x="20" y="214" font-size="13" fill="#6B7280">Untuk</text>
+    <text x="20" y="238" font-size="15" font-weight="600" fill="#111827">Klien A</text>
+    <text x="20" y="258" font-size="13" fill="#6B7280">0812-xxxx-xxxx · Jl. Contoh 12</text>
+    <path d="M362 232 l6 6 l-6 6" fill="none" stroke="#6B7280" stroke-width="2"/>
+    <line x1="20" y1="278" x2="370" y2="278" stroke="#F0F1F3"/>
+
+    <text x="20" y="310" font-size="13" fill="#6B7280">Jatuh tempo</text>
+    <text x="20" y="334" font-size="15" font-weight="600" fill="#111827">3 Des 2026</text>
+    <g font-size="13" font-weight="600">
+      <rect x="196" y="306" width="54" height="36" rx="10" fill="#F3F4F6"/><text x="223" y="329" text-anchor="middle" fill="#374151">7 h</text>
+      <rect x="256" y="306" width="54" height="36" rx="10" fill="#EFF6FF"/><text x="283" y="329" text-anchor="middle" fill="#1D4ED8">14 h</text>
+      <rect x="316" y="306" width="54" height="36" rx="10" fill="#F3F4F6"/><text x="343" y="329" text-anchor="middle" fill="#374151">30 h</text>
+    </g>
+    <line x1="20" y1="362" x2="370" y2="362" stroke="#F0F1F3"/>
+
+    <text x="20" y="408" font-size="17" font-weight="600" fill="#111827">Item</text>
+    <text x="20" y="446" font-size="15" fill="#111827">Desain logo</text>
+    <text x="20" y="466" font-size="13" fill="#6B7280">1 × Rp 1.500.000</text>
+    <text x="370" y="446" text-anchor="end" font-size="15" fill="#111827">Rp 1.500.000</text>
+    <text x="20" y="502" font-size="15" fill="#111827">Kartu nama</text>
+    <text x="20" y="522" font-size="13" fill="#6B7280">2 box × Rp 450.000</text>
+    <text x="370" y="502" text-anchor="end" font-size="15" fill="#111827">Rp 900.000</text>
+    <text x="20" y="558" font-size="15" fill="#111827">Revisi tambahan</text>
+    <text x="20" y="578" font-size="13" fill="#6B7280">3 jam × Rp 200.000</text>
+    <text x="370" y="558" text-anchor="end" font-size="15" fill="#111827">Rp 600.000</text>
+    <text x="20" y="622" font-size="14" font-weight="600" fill="#2563EB">+ Tambah item</text>
+    <text x="150" y="622" font-size="14" font-weight="600" fill="#2563EB">Dari katalog</text>
+    <line x1="20" y1="648" x2="370" y2="648" stroke="#F0F1F3"/>
+
+    <text x="20" y="684" font-size="15" fill="#111827">PPN 11%, catatan</text>
+    <path d="M362 678 l6 6 l-6 6" fill="none" stroke="#6B7280" stroke-width="2"/>
+
+    <rect x="0" y="736" width="390" height="108" fill="#FFFFFF"/>
+    <line x1="0" y1="736" x2="390" y2="736" stroke="#F0F1F3"/>
+    <text x="20" y="772" font-size="13" fill="#6B7280">Total</text>
+    <text x="20" y="800" font-size="22" font-weight="700" fill="#111827">Rp 3.330.000</text>
+    <rect x="222" y="760" width="148" height="52" rx="12" fill="#2563EB"/><text x="296" y="791" text-anchor="middle" font-size="15" font-weight="600" fill="#FFFFFF">Buat PDF</text>
+  </g>
+
+  <g font-size="13" fill="#111827">
+    <text x="440" y="60" font-size="18" font-weight="700">02 · Invoice baru (pola A)</text>
+    <text x="440" y="84" fill="#374151">Satu halaman, dibaca seperti invoice-nya sendiri.</text>
+    <text x="440" y="124" font-weight="600">Isi lebih dulu, form belakangan</text>
+    <text x="440" y="144" fill="#374151">Klien, tanggal, pajak tampil sebagai teks;</text>
+    <text x="440" y="162" fill="#374151">tap baris membuka sheet untuk mengubah.</text>
+    <text x="440" y="202" font-weight="600">Item = baris teks</text>
+    <text x="440" y="222" fill="#374151">Tap untuk edit, geser untuk hapus + Urungkan.</text>
+    <text x="440" y="240" fill="#374151">Dulu 5 field dan 3 ikon kecil per item.</text>
+    <text x="440" y="280" font-weight="600">Jatuh tempo: chip cepat</text>
+    <text x="440" y="300" fill="#374151">7/14/30 hari; tanggal lain lewat tap teks.</text>
+    <text x="440" y="340" font-weight="600">Total menempel di bawah</text>
+    <text x="440" y="360" fill="#374151">Satu tombol utama di layar: Buat PDF.</text>
+    <text x="440" y="400" font-weight="600">Smooth</text>
+    <text x="440" y="420" fill="#374151">Ketik qty/harga hanya membangun ulang</text>
+    <text x="440" y="438" fill="#374151">baris itu dan total (ValueListenableBuilder),</text>
+    <text x="440" y="456" fill="#374151">bukan seluruh halaman lewat setState.</text>
+    <text x="440" y="474" fill="#374151">Total berganti dengan fade 150ms.</text>
+    <text x="440" y="840" font-size="12" fill="#6B7280">Nama dan angka: data contoh.</text>
+  </g>
+</svg>
