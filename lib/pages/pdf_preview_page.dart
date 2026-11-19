@@ -30,12 +30,9 @@ class PdfPreviewPage extends StatelessWidget {
         title: Text(title),
         actions: [
           TextButton.icon(
-            onPressed: () {
-              // Pop preview + form page, back to MainNavigation
-              Navigator.of(context)
-                ..pop()  // close PdfPreviewPage
-                ..pop(); // close FakturPage/StrukPage
-            },
+            // Caller decides what to close next; popping twice here also
+            // closed MainNavigation when opened from History.
+            onPressed: () => Navigator.of(context).pop(true),
             icon: Icon(Icons.check_rounded,
                 color: theme.colorScheme.primary, size: 20),
             label: Text('Selesai',

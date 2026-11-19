@@ -356,7 +356,7 @@ class _StrukPageState extends State<StrukPage> {
 
     _isDirty = false;
     if (!mounted) return;
-    await Navigator.push(
+    final done = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => PdfPreviewPage(
@@ -375,7 +375,8 @@ class _StrukPageState extends State<StrukPage> {
       ),
     );
     if (!mounted) return;
-    _showReminderDialog(struk);
+    await _showReminderDialog(struk);
+    if (done == true && mounted) Navigator.pop(context);
   }
 
   Future<void> _showReminderDialog(StrukModel struk) async {

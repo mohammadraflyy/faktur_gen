@@ -339,7 +339,7 @@ class _FakturPageState extends State<FakturPage> {
 
     _isDirty = false;
     if (!mounted) return;
-    await Navigator.push(
+    final done = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => PdfPreviewPage(
@@ -355,7 +355,8 @@ class _FakturPageState extends State<FakturPage> {
       ),
     );
     if (!mounted) return;
-    _showReminderDialog(faktur);
+    await _showReminderDialog(faktur);
+    if (done == true && mounted) Navigator.pop(context);
   }
 
   Future<void> _showReminderDialog(FakturModel faktur) async {
