@@ -1214,6 +1214,13 @@ class _TemplateSubPageState extends State<_TemplateSubPage>
               title: tr('template.show_signature'),
               value: _config.showSignature,
               onChanged: (v) => setState(() => _config.showSignature = v)),
+          if (_config.showSignature)
+            _toggleTile(theme,
+                icon: Icons.verified_outlined,
+                title: tr('template.show_stamp'),
+                subtitle: tr('template.show_stamp_note'),
+                value: _config.showStamp,
+                onChanged: (v) => setState(() => _config.showStamp = v)),
           _toggleTile(theme,
               icon: Icons.account_balance_outlined,
               title: tr('template.show_bank'),

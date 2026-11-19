@@ -207,6 +207,8 @@ const _strings = <String, List<String>>{
   'template.logo_center': ['Logo di Tengah', 'Center Logo'],
   'template.logo_center_off': ['Off = logo di kiri', 'Off = logo on left'],
   'template.show_signature': ['Tampilkan Tanda Tangan', 'Show Signature'],
+  'template.show_stamp': ['Stempel Logo di Tanda Tangan', 'Logo Stamp on Signature'],
+  'template.show_stamp_note': ['Logo tampil samar di belakang tanda tangan', 'Logo appears faded behind the signature'],
   'template.show_bank': ['Tampilkan Info Bank', 'Show Bank Info'],
   'template.show_npwp': ['Tampilkan NPWP', 'Show Tax ID'],
 

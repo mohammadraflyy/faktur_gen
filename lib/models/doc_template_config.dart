@@ -26,6 +26,7 @@ class DocTemplateConfig {
   int primaryColorValue; // stored as int (0xAARRGGBB)
   bool showLogo;
   bool showSignature;
+  bool showStamp; // logo as faded stamp behind signature
   bool showBankInfo;
   bool showNpwp;
   bool logoCenter; // true=center, false=left
@@ -36,6 +37,7 @@ class DocTemplateConfig {
     this.primaryColorValue = 0xFF2563EB,
     this.showLogo = true,
     this.showSignature = true,
+    this.showStamp = false,
     this.showBankInfo = true,
     this.showNpwp = true,
     this.logoCenter = false,
@@ -47,6 +49,7 @@ class DocTemplateConfig {
         'primaryColorValue': primaryColorValue,
         'showLogo': showLogo,
         'showSignature': showSignature,
+        'showStamp': showStamp,
         'showBankInfo': showBankInfo,
         'showNpwp': showNpwp,
         'logoCenter': logoCenter,
@@ -65,6 +68,7 @@ class DocTemplateConfig {
       primaryColorValue: m['primaryColorValue'] ?? 0xFF2563EB,
       showLogo: m['showLogo'] ?? true,
       showSignature: m['showSignature'] ?? true,
+      showStamp: m['showStamp'] ?? false,
       showBankInfo: m['showBankInfo'] ?? true,
       showNpwp: m['showNpwp'] ?? true,
       logoCenter: m['logoCenter'] ?? false,

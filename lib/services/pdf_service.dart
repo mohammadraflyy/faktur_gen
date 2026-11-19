@@ -138,7 +138,10 @@ class PdfService {
             ),
             pw.SizedBox(height: 24),
           ],
-          _footer(faktur, signatureBytes: showSig ? signatureBytes : null, tpl: tpl),
+          _footer(faktur,
+              signatureBytes: showSig ? signatureBytes : null,
+              stampBytes: showSig && (tpl?.showStamp ?? false) ? logoBytes : null,
+              tpl: tpl),
           if (qrisMerchantId != null && qrisMerchantId.isNotEmpty) ...[
             pw.SizedBox(height: 16),
             pw.Row(
@@ -583,7 +586,8 @@ class PdfService {
   // Footer: catatan (kiri) + tanda tangan (kanan)
   // ─────────────────────────────────────────────────────────────────────────
 
-  static pw.Widget _footer(FakturModel f, {Uint8List? signatureBytes, DocTemplateConfig? tpl}) {
+  static pw.Widget _footer(FakturModel f,
+      {Uint8List? signatureBytes, Uint8List? stampBytes, DocTemplateConfig? tpl}) {
     return pw.Row(
       crossAxisAlignment: pw.CrossAxisAlignment.end,
       children: [
@@ -615,11 +619,27 @@ class PdfService {
                 style: const pw.TextStyle(fontSize: 9, color: _textGrey)),
             if (signatureBytes != null) ...[
               pw.SizedBox(height: 4),
-              pw.Image(
-                pw.MemoryImage(signatureBytes),
-                width: 120,
-                height: 50,
-                fit: pw.BoxFit.contain,
+              pw.Stack(
+                alignment: pw.Alignment.center,
+                overflow: pw.Overflow.visible,
+                children: [
+                  if (stampBytes != null)
+                    pw.Positioned(
+                      left: 0,
+                      top: -10,
+                      child: pw.Opacity(
+                        opacity: 0.3,
+                        child: pw.Image(pw.MemoryImage(stampBytes),
+                            width: 70, height: 70, fit: pw.BoxFit.contain),
+                      ),
+                    ),
+                  pw.Image(
+                    pw.MemoryImage(signatureBytes),
+                    width: 120,
+                    height: 50,
+                    fit: pw.BoxFit.contain,
+                  ),
+                ],
               ),
               pw.SizedBox(height: 4),
             ] else
