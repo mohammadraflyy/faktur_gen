@@ -4,10 +4,13 @@ import 'package:google_fonts/google_fonts.dart';
 import '../main.dart';
 import '../services/locale_service.dart';
 import '../services/reminder_service.dart';
+import '../services/subscription_service.dart';
 import '../services/updater_service.dart';
+import '../widgets/paywall_sheet.dart';
 import 'dashboard_page.dart';
 import 'faktur_page.dart';
 import 'history_page.dart';
+import 'recurring_invoice_page.dart';
 import 'reminder_page.dart';
 import 'settings_page.dart';
 import 'struk_page.dart';
@@ -135,6 +138,17 @@ class _MainNavigationState extends State<MainNavigation> {
     _loadDueCount();
   }
 
+  // Same Pro gate as the row in Pengaturan.
+  Future<void> _openRecurring() async {
+    final sub = await SubscriptionService.load();
+    if (!mounted) return;
+    if (!sub.isPro) {
+      showPaywallSheet(context);
+      return;
+    }
+    _openCreatePage(const RecurringInvoicePage());
+  }
+
   void _showCreateSheet() {
     final theme = Theme.of(context);
     showModalBottomSheet(
@@ -194,6 +208,17 @@ class _MainNavigationState extends State<MainNavigation> {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.repeat_rounded),
+                title: Text(tr('recurring.title')),
+                subtitle: Text(tr('recurring.subtitle')),
+                onTap: () {
+                  Navigator.pop(context);
+                  _openRecurring();
+                },
               ),
               const SizedBox(height: 8),
             ],
