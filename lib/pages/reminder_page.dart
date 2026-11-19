@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../main.dart';
@@ -615,15 +614,16 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
 
   bool get _isEditing => widget.reminder != null;
 
-  final _dateFormat = DateFormat('dd MMM yyyy', 'id_ID');
+  DateFormat get _dateFormat =>
+      DateFormat('dd MMM yyyy', LocaleService.isEn ? 'en_US' : 'id_ID');
 
-  final _presetServices = [
-    'Cuci AC',
-    'Service AC',
-    'Ganti Filter AC',
-    'Perawatan Rutin',
-    'Service Mesin',
-    'Pengecekan Berkala',
+  static const _presetServiceKeys = [
+    'reminder.preset_ac_wash',
+    'reminder.preset_ac_service',
+    'reminder.preset_ac_filter',
+    'reminder.preset_routine',
+    'reminder.preset_engine',
+    'reminder.preset_check',
   ];
 
   @override
@@ -670,9 +670,7 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
     final selected = await showModalBottomSheet<ContactModel>(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      showDragHandle: true,
       builder: (_) => _ContactManagerSheet(
         contacts: _contacts,
         onChanged: () => _loadContacts(),
@@ -746,33 +744,17 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
                   child: Text(
                     _isEditing ? tr('reminder.edit_title') : tr('reminder.add_title'),
-                    style: GoogleFonts.inter(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: theme.colorScheme.onSurface,
-                    ),
+                    style: theme.textTheme.titleMedium,
                   ),
                 ),
                 IconButton(
                   onPressed: () => Navigator.pop(context),
-                  icon: Icon(Icons.close_rounded,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.4)),
+                  icon: const Icon(Icons.close_rounded),
                   tooltip: tr('common.close'),
                 ),
               ],
@@ -785,7 +767,7 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
                     controller: _contactCtrl,
                     decoration: InputDecoration(labelText: tr('reminder.customer_name')),
                     validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
+                        (v == null || v.trim().isEmpty) ? tr('common.required') : null,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -793,9 +775,6 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
                   onPressed: _showContactPicker,
                   icon: const Icon(Icons.contacts_outlined),
                   tooltip: tr('reminder.pick_contact'),
-                  style: IconButton.styleFrom(
-                    backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.08),
-                  ),
                 ),
               ],
             ),
@@ -824,15 +803,16 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
                 hintText: tr('reminder.service_hint'),
               ),
               validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
+                  (v == null || v.trim().isEmpty) ? tr('common.required') : null,
             ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 6,
               runSpacing: 4,
-              children: _presetServices.map((s) {
+              children: _presetServiceKeys.map((key) {
+                final s = tr(key);
                 return ActionChip(
-                  label: Text(s, style: const TextStyle(fontSize: 11)),
+                  label: Text(s),
                   visualDensity: VisualDensity.compact,
                   onPressed: () => setState(() => _serviceCtrl.text = s),
                 );
@@ -851,10 +831,7 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
                         labelText: tr('reminder.date'),
                         suffixIcon: Icon(Icons.calendar_today, size: 18),
                       ),
-                      child: Text(
-                        _dateFormat.format(_reminderDate),
-                        style: const TextStyle(fontSize: 14),
-                      ),
+                      child: Text(_dateFormat.format(_reminderDate)),
                     ),
                   ),
                 ),
@@ -869,10 +846,7 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
                         labelText: tr('reminder.time'),
                         suffixIcon: Icon(Icons.access_time, size: 18),
                       ),
-                      child: Text(
-                        _reminderTime.format(context),
-                        style: const TextStyle(fontSize: 14),
-                      ),
+                      child: Text(_reminderTime.format(context)),
                     ),
                   ),
                 ),
@@ -883,11 +857,11 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
               spacing: 6,
               runSpacing: 4,
               children: [
-                _quickDateChip('1 Bulan', 30),
-                _quickDateChip('2 Bulan', 60),
-                _quickDateChip('3 Bulan', 90),
-                _quickDateChip('6 Bulan', 180),
-                _quickDateChip('1 Tahun', 365),
+                _quickDateChip(trN('reminder.months', 1), 30),
+                _quickDateChip(trN('reminder.months', 2), 60),
+                _quickDateChip(trN('reminder.months', 3), 90),
+                _quickDateChip(trN('reminder.months', 6), 180),
+                _quickDateChip(tr('reminder.one_year'), 365),
               ],
             ),
             const SizedBox(height: 14),
@@ -898,8 +872,8 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
                 prefixIcon: Icon(Icons.repeat, size: 20),
               ),
               items: RepeatInterval.values
-                  .map((r) =>
-                      DropdownMenuItem(value: r, child: Text(r.label)))
+                  .map((r) => DropdownMenuItem(
+                      value: r, child: Text(tr('reminder.repeat_${r.name}'))))
                   .toList(),
               onChanged: (v) {
                 if (v != null) setState(() => _repeatInterval = v);
@@ -933,7 +907,7 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
 
   Widget _quickDateChip(String label, int days) {
     return ActionChip(
-      label: Text(label, style: const TextStyle(fontSize: 11)),
+      label: Text(label),
       visualDensity: VisualDensity.compact,
       onPressed: () =>
           setState(() => _reminderDate = DateTime.now().add(Duration(days: days))),
@@ -1006,9 +980,7 @@ class _ContactManagerSheetState extends State<_ContactManagerSheet> {
     final result = await showModalBottomSheet<ContactModel>(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      showDragHandle: true,
       builder: (_) => const _ContactFormSheet(),
     );
     if (result != null) {
@@ -1021,9 +993,7 @@ class _ContactManagerSheetState extends State<_ContactManagerSheet> {
     final result = await showModalBottomSheet<ContactModel>(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      showDragHandle: true,
       builder: (_) => _ContactFormSheet(contact: contact),
     );
     if (result != null) {
@@ -1045,7 +1015,9 @@ class _ContactManagerSheetState extends State<_ContactManagerSheet> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(tr('common.delete'), style: const TextStyle(color: Colors.red)),
+            child: Text(tr('common.delete'),
+                style: TextStyle(
+                    color: AppColors.errorFor(Theme.of(ctx).brightness))),
           ),
         ],
       ),
@@ -1059,6 +1031,7 @@ class _ContactManagerSheetState extends State<_ContactManagerSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final error = AppColors.errorFor(theme.brightness);
     return DraggableScrollableSheet(
       initialChildSize: 0.6,
       maxChildSize: 0.9,
@@ -1068,38 +1041,19 @@ class _ContactManagerSheetState extends State<_ContactManagerSheet> {
         return Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
                 children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
                   Row(
                     children: [
-                      Icon(Icons.contacts_rounded,
-                          color: theme.colorScheme.primary, size: 22),
-                      const SizedBox(width: 8),
-                      Text(
-                        tr('contact.title'),
-                        style: GoogleFonts.inter(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: theme.colorScheme.onSurface,
-                        ),
+                      Expanded(
+                        child: Text(tr('contact.title'),
+                            style: theme.textTheme.titleMedium),
                       ),
-                      const Spacer(),
                       TextButton.icon(
                         onPressed: _addContact,
                         icon: const Icon(Icons.person_add_outlined, size: 18),
-                        label: Text(tr('contact.add'), style: const TextStyle(fontSize: 13)),
+                        label: Text(tr('contact.add')),
                       ),
                     ],
                   ),
@@ -1109,19 +1063,8 @@ class _ContactManagerSheetState extends State<_ContactManagerSheet> {
                     onChanged: _onSearch,
                     decoration: InputDecoration(
                       hintText: tr('contact.search'),
-                      hintStyle: GoogleFonts.inter(
-                          fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45)),
-                      prefixIcon: const Icon(Icons.search, size: 20),
-                      filled: true,
-                      fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 10),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
-                      ),
+                      prefixIcon: const Icon(Icons.search),
                     ),
-                    style: GoogleFonts.inter(fontSize: 13),
                   ),
                   const SizedBox(height: 8),
                 ],
@@ -1131,35 +1074,34 @@ class _ContactManagerSheetState extends State<_ContactManagerSheet> {
             Expanded(
               child: _filtered.isEmpty
                   ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.person_off_outlined,
-                              size: 48, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15)),
-                          const SizedBox(height: 8),
-                          Text(
-                            _contacts.isEmpty
-                                ? tr('contact.empty')
-                                : tr('contact.not_found'),
-                            style: GoogleFonts.inter(
-                                fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35)),
-                          ),
-                          if (_contacts.isEmpty) ...[
-                            const SizedBox(height: 4),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
                             Text(
-                              'Tap "Tambah" untuk menambah kontak baru',
-                              style: GoogleFonts.inter(
-                                  fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35)),
+                              _contacts.isEmpty
+                                  ? tr('contact.empty')
+                                  : tr('contact.not_found'),
+                              style: theme.textTheme.bodyLarge,
+                              textAlign: TextAlign.center,
                             ),
+                            if (_contacts.isEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(tr('contact.empty_hint'),
+                                  style: theme.textTheme.bodySmall,
+                                  textAlign: TextAlign.center),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     )
                   : ListView.separated(
                       controller: scrollController,
-                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+                      padding: const EdgeInsets.fromLTRB(4, 0, 4, 24),
                       itemCount: _filtered.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 4),
+                      separatorBuilder: (_, _) =>
+                          const Divider(height: 1, indent: 16, endIndent: 16),
                       itemBuilder: (_, i) {
                         final c = _filtered[i];
                         final initials = c.nama.isNotEmpty
@@ -1173,22 +1115,17 @@ class _ContactManagerSheetState extends State<_ContactManagerSheet> {
                         return ListTile(
                           leading: CircleAvatar(
                             radius: 18,
-                            child: Text(initials,
-                                style: const TextStyle(fontSize: 12)),
+                            child: Text(initials),
                           ),
                           title: Text(c.nama,
-                              style: const TextStyle(fontSize: 14)),
+                              style: theme.textTheme.titleSmall),
                           subtitle: c.telepon.isNotEmpty
                               ? Text(c.telepon,
-                                  style: const TextStyle(fontSize: 12))
+                                  style: theme.textTheme.bodySmall)
                               : null,
-                          dense: true,
                           onTap: () => Navigator.pop(context, c),
                           trailing: PopupMenuButton<String>(
-                            icon: Icon(Icons.more_vert,
-                                size: 18,
-                                color: theme.colorScheme.onSurface
-                                    .withValues(alpha: 0.4)),
+                            icon: const Icon(Icons.more_vert),
                             onSelected: (v) {
                               if (v == 'edit') _editContact(c);
                               if (v == 'delete') _deleteContact(c);
@@ -1197,22 +1134,18 @@ class _ContactManagerSheetState extends State<_ContactManagerSheet> {
                               PopupMenuItem(
                                 value: 'edit',
                                 child: ListTile(
-                                  leading: const Icon(Icons.edit_outlined, size: 20),
-                                  title: Text(tr('common.edit'),
-                                      style: const TextStyle(fontSize: 14)),
-                                  dense: true,
+                                  leading: const Icon(Icons.edit_outlined),
+                                  title: Text(tr('common.edit')),
                                   contentPadding: EdgeInsets.zero,
                                 ),
                               ),
                               PopupMenuItem(
                                 value: 'delete',
                                 child: ListTile(
-                                  leading: const Icon(Icons.delete_outline,
-                                      size: 20, color: Colors.red),
+                                  leading: Icon(Icons.delete_outline,
+                                      color: error),
                                   title: Text(tr('common.delete'),
-                                      style: const TextStyle(
-                                          fontSize: 14, color: Colors.red)),
-                                  dense: true,
+                                      style: TextStyle(color: error)),
                                   contentPadding: EdgeInsets.zero,
                                 ),
                               ),
@@ -1283,7 +1216,7 @@ class _ContactFormSheetState extends State<_ContactFormSheet> {
   Widget build(BuildContext context) {
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
     return Padding(
-      padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottom),
+      padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + bottom),
       child: SingleChildScrollView(
         child: Form(
           key: _formKey,
@@ -1291,30 +1224,16 @@ class _ContactFormSheetState extends State<_ContactFormSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
               Text(
                 _isEditing ? tr('contact.edit_title') : tr('contact.add_title'),
-                style: GoogleFonts.inter(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 20),
               TextFormField(
                 controller: _namaCtrl,
                 decoration: InputDecoration(labelText: tr('contact.name')),
                 validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
+                    (v == null || v.trim().isEmpty) ? tr('common.required') : null,
               ),
               const SizedBox(height: 14),
               TextFormField(

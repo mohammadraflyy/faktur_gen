@@ -123,7 +123,6 @@ const _strings = <String, List<String>>{
   'reminder.notes_optional': ['Catatan (opsional)', 'Notes (optional)'],
   'reminder.status': ['Status', 'Status'],
   'reminder.mark_done': ['Tandai Selesai', 'Mark as Done'],
-  'reminder.marked_done': ['ditandai selesai', 'marked as done'],
   'reminder.reschedule': ['Jadwal Ulang', 'Reschedule'],
   'reminder.send_wa': ['Kirim WhatsApp', 'Send WhatsApp'],
   'reminder.no_phone': ['Nomor telepon tidak tersedia', 'Phone number not available'],
@@ -150,6 +149,15 @@ const _strings = <String, List<String>>{
   'reminder.repeat_quarterly': ['Setiap 3 Bulan', 'Every 3 months'],
   'reminder.repeat_semiannual': ['Setiap 6 Bulan', 'Every 6 months'],
   'reminder.repeat_annual': ['Setiap 1 Tahun', 'Every year'],
+  'reminder.preset_ac_wash': ['Cuci AC', 'AC cleaning'],
+  'reminder.preset_ac_service': ['Service AC', 'AC service'],
+  'reminder.preset_ac_filter': ['Ganti Filter AC', 'AC filter change'],
+  'reminder.preset_routine': ['Perawatan Rutin', 'Routine maintenance'],
+  'reminder.preset_engine': ['Service Mesin', 'Engine service'],
+  'reminder.preset_check': ['Pengecekan Berkala', 'Periodic check'],
+  'reminder.months': ['{n} Bulan', '{n} months'],
+  'reminder.months_one': ['{n} Bulan', '{n} month'],
+  'reminder.one_year': ['1 Tahun', '1 year'],
 
   // ─── Contacts ────────────────────────────────────────────────────────────
   'contact.title': ['Kontak', 'Contacts'],
@@ -161,6 +169,7 @@ const _strings = <String, List<String>>{
   'contact.empty': ['Belum ada kontak', 'No contacts yet'],
   'contact.not_found': ['Tidak ditemukan', 'Not found'],
   'contact.name': ['Nama', 'Name'],
+  'contact.empty_hint': ['Tap "Tambah" untuk menambah kontak baru', 'Tap "Add" to add a new contact'],
 
   // ─── Settings ────────────────────────────────────────────────────────────
   'settings.title': ['Pengaturan', 'Settings'],
@@ -394,6 +403,7 @@ const _strings = <String, List<String>>{
   'common.import_fail': ['Gagal import', 'Import failed'],
   'common.phone': ['Telepon', 'Phone'],
   'common.address': ['Alamat', 'Address'],
+  'common.required': ['Wajib diisi', 'Required'],
   'dashboard.unpaid_heading': ['Belum dibayar', 'Unpaid'],
   'dashboard.invoice_count': ['{n} invoice', '{n} invoices'],
   'dashboard.invoice_count_one': ['{n} invoice', '{n} invoice'],
