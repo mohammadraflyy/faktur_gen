@@ -80,6 +80,11 @@ void main() {
     expect(find.text('Simpan · Rp 2,500'), findsOneWidget);
   });
 
+  testWidgets('fractional price is prefilled rounded', (tester) async {
+    await _open(tester, ItemFaktur(namaBarang: 'A', hargaSatuan: 1500.5));
+    expect(find.text('Simpan · Rp 1,501'), findsOneWidget);
+  });
+
   testWidgets('empty name blocks save', (tester) async {
     final read = await _open(tester, ItemFaktur(), isNew: true);
     await tester.tap(find.text('Simpan · Rp 0'));

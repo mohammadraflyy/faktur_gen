@@ -305,7 +305,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget _miniBars(ThemeData theme, List<MonthTotal> months) {
     final max = months.fold<double>(0, (m, e) => e.total > m ? e.total : m);
-    final muted = theme.colorScheme.onSurface.withValues(alpha: 0.12);
+    final muted = theme.colorScheme.onSurface.withValues(alpha: 0.47);
     return Semantics(
       label: tr('dashboard.six_months'),
       excludeSemantics: true,

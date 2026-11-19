@@ -157,6 +157,7 @@ class _FakturPageState extends State<FakturPage> {
       _npwpPembeliCtrl.text = contact.npwp;
       _alamatPembeliCtrl.text = contact.alamat;
       _teleponPembeliCtrl.text = contact.telepon;
+      _isDirty = true;
     });
   }
 
@@ -814,50 +815,52 @@ class _FakturPageState extends State<FakturPage> {
       builder: (ctx) => Padding(
         padding: EdgeInsets.fromLTRB(
             20, 0, 20, 20 + MediaQuery.viewInsetsOf(ctx).bottom),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                    child: Text(tr('invoice.client'),
-                        style: Theme.of(ctx).textTheme.titleMedium)),
-                TextButton.icon(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    _showContactPicker();
-                  },
-                  icon: const Icon(Icons.contacts_outlined, size: 18),
-                  label: Text(tr('invoice.from_contacts')),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _namaPembeliCtrl,
-              autofocus: _namaPembeliCtrl.text.isEmpty,
-              textCapitalization: TextCapitalization.words,
-              decoration: InputDecoration(labelText: tr('invoice.client_name')),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _teleponPembeliCtrl,
-              keyboardType: TextInputType.phone,
-              decoration: InputDecoration(labelText: tr('invoice.client_phone')),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _alamatPembeliCtrl,
-              maxLines: 2,
-              decoration:
-                  InputDecoration(labelText: tr('invoice.client_address')),
-            ),
-            const SizedBox(height: 20),
-            FilledButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(tr('common.done'))),
-          ],
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                      child: Text(tr('invoice.client'),
+                          style: Theme.of(ctx).textTheme.titleMedium)),
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _showContactPicker();
+                    },
+                    icon: const Icon(Icons.contacts_outlined, size: 18),
+                    label: Text(tr('invoice.from_contacts')),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _namaPembeliCtrl,
+                autofocus: _namaPembeliCtrl.text.isEmpty,
+                textCapitalization: TextCapitalization.words,
+                decoration: InputDecoration(labelText: tr('invoice.client_name')),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _teleponPembeliCtrl,
+                keyboardType: TextInputType.phone,
+                decoration: InputDecoration(labelText: tr('invoice.client_phone')),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _alamatPembeliCtrl,
+                maxLines: 2,
+                decoration:
+                    InputDecoration(labelText: tr('invoice.client_address')),
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(tr('common.done'))),
+            ],
+          ),
         ),
       ),
     );
@@ -876,11 +879,13 @@ class _FakturPageState extends State<FakturPage> {
             .inDays;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: InkWell(
-              onTap: () => _pickDate(true),
+          InkWell(
+            onTap: () => _pickDate(true),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 48),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Column(
@@ -899,19 +904,25 @@ class _FakturPageState extends State<FakturPage> {
               ),
             ),
           ),
-          for (final d in const [7, 14, 30])
-            Padding(
-              padding: const EdgeInsets.only(left: 6),
-              child: ChoiceChip(
-                label: Text(tr('invoice.days_short').replaceAll('{n}', '$d')),
-                selected: days == d,
-                showCheckmark: false,
-                onSelected: (_) => setState(() {
-                  _faktur.jatuhTempo = _faktur.tanggal.add(Duration(days: d));
-                  _isDirty = true;
-                }),
-              ),
-            ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final d in const [7, 14, 30])
+                ChoiceChip(
+                  label:
+                      Text(tr('invoice.days_short').replaceAll('{n}', '$d')),
+                  selected: days == d,
+                  showCheckmark: false,
+                  onSelected: (_) => setState(() {
+                    _faktur.jatuhTempo =
+                        _faktur.tanggal.add(Duration(days: d));
+                    _isDirty = true;
+                  }),
+                ),
+            ],
+          ),
         ],
       ),
     );
@@ -1017,40 +1028,42 @@ class _FakturPageState extends State<FakturPage> {
         builder: (ctx, setSheet) => Padding(
           padding: EdgeInsets.fromLTRB(
               20, 0, 20, 20 + MediaQuery.viewInsetsOf(ctx).bottom),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(tr('invoice.extras_title'),
-                  style: Theme.of(ctx).textTheme.titleMedium),
-              const SizedBox(height: 8),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(tr('invoice.date')),
-                trailing: Text(DateFormat('d MMM yyyy', _dateLocale)
-                    .format(_faktur.tanggal)),
-                onTap: () async {
-                  await _pickDate(false);
-                  setSheet(() {});
-                },
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(tr('invoice.tax')),
-                subtitle: Text(tr('invoice.tax_hint')),
-                trailing: Text('${_fmtQty(_faktur.taxRate)}%'),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _catatanCtrl,
-                maxLines: 3,
-                decoration: InputDecoration(labelText: tr('invoice.notes')),
-              ),
-              const SizedBox(height: 20),
-              FilledButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: Text(tr('common.done'))),
-            ],
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(tr('invoice.extras_title'),
+                    style: Theme.of(ctx).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(tr('invoice.date')),
+                  trailing: Text(DateFormat('d MMM yyyy', _dateLocale)
+                      .format(_faktur.tanggal)),
+                  onTap: () async {
+                    await _pickDate(false);
+                    setSheet(() {});
+                  },
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(tr('invoice.tax')),
+                  subtitle: Text(tr('invoice.tax_hint')),
+                  trailing: Text('${_fmtQty(_faktur.taxRate)}%'),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _catatanCtrl,
+                  maxLines: 3,
+                  decoration: InputDecoration(labelText: tr('invoice.notes')),
+                ),
+                const SizedBox(height: 20),
+                FilledButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: Text(tr('common.done'))),
+              ],
+            ),
           ),
         ),
       ),
@@ -1122,7 +1135,8 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: Text(tr('common.delete'),
-                style: const TextStyle(color: Colors.red)),
+                style: TextStyle(
+                    color: AppColors.errorFor(Theme.of(ctx).brightness))),
           ),
         ],
       ),

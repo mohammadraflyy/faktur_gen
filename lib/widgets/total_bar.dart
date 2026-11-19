@@ -47,6 +47,10 @@ class TotalBar extends StatelessWidget {
                       valueListenable: total,
                       builder: (_, value, child) => AnimatedSwitcher(
                         duration: fade,
+                        layoutBuilder: (current, previous) => Stack(
+                          alignment: Alignment.centerLeft,
+                          children: [...previous, ?current],
+                        ),
                         child: Text(
                           currency.format(value),
                           key: ValueKey(value),

@@ -51,7 +51,9 @@ class _ItemEditSheetState extends State<ItemEditSheet> {
   late final _deskripsi = TextEditingController(text: widget.item.deskripsi);
   late final _satuan = TextEditingController(text: widget.item.satuan);
   late final _harga = TextEditingController(
-      text: widget.item.hargaSatuan > 0 ? _fmt(widget.item.hargaSatuan) : '');
+      text: widget.item.hargaSatuan > 0
+          ? widget.item.hargaSatuan.round().toString()
+          : '');
   late double _qty = widget.item.kuantitas;
 
   static String _fmt(double v) =>
