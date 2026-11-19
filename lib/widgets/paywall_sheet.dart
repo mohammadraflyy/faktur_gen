@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/billing_service.dart';
@@ -243,17 +244,18 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                 ),
               ),
             ),
-            // Debug: activate Pro without payment (remove in production)
-            TextButton(
-              onPressed: _isLoading ? null : _debugActivate,
-              child: Text(
-                'Activate Pro (Debug)',
-                style: GoogleFonts.inter(
-                  fontSize: 11,
-                  color: isDark ? Colors.grey[600] : Colors.grey[400],
+            // Free Pro for testing; must never reach a release build.
+            if (kDebugMode)
+              TextButton(
+                onPressed: _isLoading ? null : _debugActivate,
+                child: Text(
+                  'Activate Pro (Debug)',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: isDark ? Colors.grey[600] : Colors.grey[400],
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),
