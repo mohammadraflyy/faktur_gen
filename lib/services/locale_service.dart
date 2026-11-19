@@ -252,6 +252,26 @@ const _strings = <String, List<String>>{
   'about.theme': ['Tampilan', 'Appearance'],
   'about.theme_desc': ['Mode terang, gelap, dan ikuti sistem', 'Light, dark, and system mode'],
   'about.made_with': ['Dibuat dengan \u2764', 'Made with \u2764'],
+  'about.version': ['Versi {version}', 'Version {version}'],
+
+  // ─── Update ──────────────────────────────────────────────────────────────
+  'update.check': ['Periksa pembaruan', 'Check for updates'],
+  'update.check_sub': ['Unduh versi terbaru dari GitHub', 'Download the latest version from GitHub'],
+  'update.checking': ['Memeriksa pembaruan rilis…', 'Checking for updates…'],
+  'update.latest': ['Aplikasi Sudah Versi Terbaru', 'App Is Up to Date'],
+  'update.latest_desc': ['Faktura Anda (v{version}) sudah merupakan versi paling mutakhir.', 'Your Faktura (v{version}) is the latest version.'],
+  'update.check_failed': ['Gagal Memeriksa', 'Check Failed'],
+  'update.check_failed_desc': ['Tidak dapat terhubung ke server rilis GitHub. Pastikan perangkat terhubung ke internet.', 'Could not reach the GitHub release server. Make sure the device is connected to the internet.'],
+  'update.title': ['Pembaruan {name}', 'Update {name}'],
+  'update.new_version': ['Versi baru tersedia: v{latest} (versi saat ini: v{current})', 'New version available: v{latest} (current version: v{current})'],
+  'update.changelog': ['Catatan Perubahan:', 'Changelog:'],
+  'update.later': ['Nanti saja', 'Not now'],
+  'update.download': ['Unduh & Perbarui', 'Download & Update'],
+  'update.downloading': ['Mengunduh… {percent}%', 'Downloading… {percent}%'],
+  'update.download_failed': ['Gagal mengunduh file update', 'Failed to download the update'],
+  'update.available': ['Pembaruan v{version} tersedia!', 'Update v{version} available!'],
+  'update.now': ['Perbarui Sekarang', 'Update Now'],
+  'update.dismiss': ['Tutup notifikasi', 'Dismiss'],
 
   // ─── Subscription ────────────────────────────────────────────────────────
   'sub.pro': ['Faktura Pro', 'Faktura Pro'],

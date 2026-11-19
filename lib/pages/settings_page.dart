@@ -14,6 +14,7 @@ import '../services/locale_service.dart';
 import '../services/settings_service.dart';
 import '../services/subscription_service.dart';
 import '../services/theme_service.dart';
+import '../services/updater_service.dart';
 import '../widgets/paywall_sheet.dart';
 import '../widgets/signature_pad.dart';
 import 'recurring_invoice_page.dart';
@@ -188,6 +189,14 @@ class _SettingsPageState extends State<SettingsPage> {
             subtitle: tr('about.subtitle'),
             onTap: () => _push(const _AboutSubPage()),
           ),
+          if (updaterSupported)
+            _menuTile(
+              theme,
+              icon: Icons.system_update_outlined,
+              title: tr('update.check'),
+              subtitle: tr('update.check_sub'),
+              onTap: () => promptAppUpdate(context),
+            ),
         ],
       ),
     );
@@ -2073,7 +2082,8 @@ class _AboutSubPage extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Versi 1.0.0',
+            tr('about.version')
+                .replaceAll('{version}', UpdaterService.currentAppVersion),
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
               fontSize: 12,

@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../main.dart';
 import '../services/locale_service.dart';
 import '../services/reminder_service.dart';
+import '../services/updater_service.dart';
 import 'dashboard_page.dart';
 import 'faktur_page.dart';
 import 'history_page.dart';
@@ -25,6 +27,9 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
   int _dueCount = 0;
+  AppUpdateInfo? _availableUpdate;
+  bool _dismissedUpdate = false;
+  Timer? _updateCheckTimer;
 
   static const _pages = [
     DashboardPage(),
@@ -37,6 +42,66 @@ class _MainNavigationState extends State<MainNavigation> {
   void initState() {
     super.initState();
     _loadDueCount();
+    if (updaterSupported) {
+      _checkUpdateNotice();
+      // The app can stay open for days on a shop counter.
+      _updateCheckTimer = Timer.periodic(const Duration(minutes: 30), (_) {
+        if (mounted && _availableUpdate == null) _checkUpdateNotice();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _updateCheckTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _checkUpdateNotice() async {
+    final info = await UpdaterService().checkForUpdate();
+    if (mounted && info != null && info.isNewer) {
+      setState(() => _availableUpdate = info);
+    }
+  }
+
+  Widget _updateBanner(ThemeData theme) {
+    final scheme = theme.colorScheme;
+    return Material(
+      color: scheme.primaryContainer,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.only(left: 20, right: 4),
+          child: Row(
+            children: [
+              Icon(Icons.system_update_outlined,
+                  color: scheme.onPrimaryContainer, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  tr('update.available')
+                      .replaceAll('{version}', _availableUpdate!.latestVersion),
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: scheme.onPrimaryContainer,
+                  ),
+                ),
+              ),
+              FilledButton(
+                onPressed: () => promptAppUpdate(context),
+                child: Text(tr('update.now')),
+              ),
+              IconButton(
+                icon: Icon(Icons.close, color: scheme.onPrimaryContainer),
+                tooltip: tr('update.dismiss'),
+                onPressed: () => setState(() => _dismissedUpdate = true),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _loadDueCount() async {
@@ -128,27 +193,42 @@ class _MainNavigationState extends State<MainNavigation> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final showBanner = _availableUpdate != null && !_dismissedUpdate;
+
+    final pages = AnimatedSwitcher(
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 200),
+      switchInCurve: Easing.emphasizedDecelerate,
+      switchOutCurve: Easing.emphasizedAccelerate,
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: SlideTransition(
+          // ~8px rise on a phone-height page.
+          position: Tween(begin: const Offset(0, 0.01), end: Offset.zero)
+              .animate(animation),
+          child: child,
+        ),
+      ),
+      child: KeyedSubtree(
+        key: ValueKey(_currentIndex),
+        child: _pages[_currentIndex],
+      ),
+    );
 
     return Scaffold(
-      body: AnimatedSwitcher(
-        duration: MediaQuery.disableAnimationsOf(context)
-            ? Duration.zero
-            : const Duration(milliseconds: 200),
-        switchInCurve: Easing.emphasizedDecelerate,
-        switchOutCurve: Easing.emphasizedAccelerate,
-        transitionBuilder: (child, animation) => FadeTransition(
-          opacity: animation,
-          child: SlideTransition(
-            // ~8px rise on a phone-height page.
-            position: Tween(begin: const Offset(0, 0.01), end: Offset.zero)
-                .animate(animation),
-            child: child,
+      body: Column(
+        children: [
+          if (showBanner) _updateBanner(theme),
+          Expanded(
+            // The banner already covers the status bar inset.
+            child: MediaQuery.removePadding(
+              context: context,
+              removeTop: showBanner,
+              child: pages,
+            ),
           ),
-        ),
-        child: KeyedSubtree(
-          key: ValueKey(_currentIndex),
-          child: _pages[_currentIndex],
-        ),
+        ],
       ),
       bottomNavigationBar: _BottomNav(
         currentIndex: _currentIndex,
