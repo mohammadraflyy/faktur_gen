@@ -586,4 +586,5 @@ const _strings = <String, List<String>>{
   'splash.tip_8': ['Backup data secara berkala untuk keamanan dokumen Anda', 'Back up your data regularly to keep your documents safe'],
   'splash.tip_9': ['Struk bisa langsung dicetak ke printer thermal 80mm', 'Receipts can be printed straight to an 80mm thermal printer'],
   'splash.tip_10': ['Aktifkan dark mode untuk kenyamanan mata di malam hari', 'Turn on dark mode to rest your eyes at night'],
+  'recurring.pick_contact': ['Pilih kontak', 'Choose contact'],
 };

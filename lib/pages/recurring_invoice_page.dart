@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import '../main.dart';
 import '../models/contact_model.dart';
 import '../models/recurring_invoice_model.dart';
 import '../models/reminder_model.dart';
@@ -8,6 +8,7 @@ import '../services/contact_service.dart';
 import '../services/locale_service.dart';
 import '../services/recurring_invoice_service.dart';
 import '../services/settings_service.dart';
+import '../widgets/status_label.dart';
 
 class RecurringInvoicePage extends StatefulWidget {
   const RecurringInvoicePage({super.key});
@@ -52,13 +53,15 @@ class _RecurringInvoicePageState extends State<RecurringInvoicePage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(tr('recurring.delete_title')),
-        content: Text('${item.contactName} — ${item.interval.label}'),
+        content: Text(
+            '${item.contactName} — ${tr('reminder.repeat_${item.interval.name}')}'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false),
             child: Text(tr('common.cancel'))),
           TextButton(onPressed: () => Navigator.pop(ctx, true),
             child: Text(tr('common.delete'),
-              style: const TextStyle(color: Colors.red))),
+              style: TextStyle(
+                  color: AppColors.errorFor(Theme.of(ctx).brightness)))),
         ],
       ),
     );
@@ -84,6 +87,7 @@ class _RecurringInvoicePageState extends State<RecurringInvoicePage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
+            tooltip: tr('recurring.add_title'),
             onPressed: _add,
           ),
         ],
@@ -99,83 +103,81 @@ class _RecurringInvoicePageState extends State<RecurringInvoicePage> {
                         color: theme.colorScheme.onSurface.withValues(alpha: 0.2)),
                       const SizedBox(height: 12),
                       Text(tr('recurring.empty'),
-                        style: GoogleFonts.inter(fontSize: 14,
-                          color: theme.colorScheme.onSurface.withValues(alpha: 0.5))),
+                        style: theme.textTheme.bodyLarge),
                       const SizedBox(height: 4),
                       Text(tr('recurring.empty_sub'),
-                        style: GoogleFonts.inter(fontSize: 12,
-                          color: theme.colorScheme.onSurface.withValues(alpha: 0.35))),
+                        style: theme.textTheme.bodySmall),
                     ],
                   ),
                 )
               : ListView.separated(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
                   itemCount: _items.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 8),
-                  itemBuilder: (_, i) => _buildCard(theme, _items[i]),
+                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  itemBuilder: (_, i) => _row(theme, _items[i]),
                 ),
     );
   }
 
-  Widget _buildCard(ThemeData theme, RecurringInvoiceModel item) {
-    final dateFormat = DateFormat('dd MMM yyyy');
+  Widget _row(ThemeData theme, RecurringInvoiceModel item) {
+    final dateFormat =
+        DateFormat('dd MMM yyyy', LocaleService.isEn ? 'en_US' : 'id_ID');
     final total = RecurringInvoiceService.calculateTotal(item);
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(item.contactName,
-                    style: GoogleFonts.inter(fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.onSurface)),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: item.isActive
-                        ? Colors.green.withValues(alpha: 0.1)
-                        : Colors.grey.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    item.isActive ? tr('recurring.active') : tr('recurring.paused'),
-                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600,
-                      color: item.isActive ? Colors.green : Colors.grey),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text('${item.interval.label} · ${tr('recurring.next')}: ${dateFormat.format(item.nextDate)}',
-              style: GoogleFonts.inter(fontSize: 12,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.5))),
-            const SizedBox(height: 4),
-            Text('${item.items.length} item · Rp ${total.toStringAsFixed(0)}',
-              style: GoogleFonts.inter(fontSize: 12,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.5))),
-            const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => _toggleActive(item),
-                  child: Text(item.isActive ? tr('recurring.pause') : tr('recurring.activate')),
-                ),
-                TextButton(onPressed: () => _edit(item),
-                  child: Text(tr('common.edit'))),
-                TextButton(onPressed: () => _delete(item),
-                  child: Text(tr('common.delete'),
-                    style: const TextStyle(color: Colors.red))),
-              ],
-            ),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.only(top: 14, bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(item.contactName,
+                    style: theme.textTheme.titleSmall),
+              ),
+              const SizedBox(width: 12),
+              StatusLabel(
+                text: item.isActive
+                    ? tr('recurring.active')
+                    : tr('recurring.paused'),
+                color: item.isActive
+                    ? AppColors.successFor(theme.brightness)
+                    : theme.colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${tr('reminder.repeat_${item.interval.name}')} · ${tr('recurring.next')}: ${dateFormat.format(item.nextDate)}',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${trN('invoice.item_count', item.items.length)} · Rp ${total.toStringAsFixed(0)}',
+            style: theme.textTheme.bodySmall,
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () => _toggleActive(item),
+                child: Text(item.isActive
+                    ? tr('recurring.pause')
+                    : tr('recurring.activate')),
+              ),
+              TextButton(
+                onPressed: () => _edit(item),
+                child: Text(tr('common.edit')),
+              ),
+              TextButton(
+                onPressed: () => _delete(item),
+                child: Text(tr('common.delete'),
+                    style: TextStyle(
+                        color: AppColors.errorFor(theme.brightness))),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -339,6 +341,7 @@ class _RecurringFormPageState extends State<_RecurringFormPage> {
                 if (_contacts.isNotEmpty)
                   IconButton(
                     icon: const Icon(Icons.contacts_outlined),
+                    tooltip: tr('recurring.pick_contact'),
                     onPressed: _pickContact,
                   ),
               ],
@@ -346,11 +349,12 @@ class _RecurringFormPageState extends State<_RecurringFormPage> {
             const SizedBox(height: 16),
             // Interval
             DropdownButtonFormField<RepeatInterval>(
-              value: _interval,
+              initialValue: _interval,
               decoration: InputDecoration(labelText: tr('recurring.interval')),
               items: RepeatInterval.values
                   .where((r) => r != RepeatInterval.none)
-                  .map((r) => DropdownMenuItem(value: r, child: Text(r.label)))
+                  .map((r) => DropdownMenuItem(
+                      value: r, child: Text(tr('reminder.repeat_${r.name}'))))
                   .toList(),
               onChanged: (v) => setState(() => _interval = v!),
             ),
@@ -359,7 +363,9 @@ class _RecurringFormPageState extends State<_RecurringFormPage> {
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: Text(tr('recurring.next_date')),
-              subtitle: Text(DateFormat('dd MMM yyyy').format(_nextDate)),
+              subtitle: Text(DateFormat('dd MMM yyyy',
+                      LocaleService.isEn ? 'en_US' : 'id_ID')
+                  .format(_nextDate)),
               trailing: const Icon(Icons.calendar_today_outlined),
               onTap: () async {
                 final date = await showDatePicker(
@@ -373,8 +379,7 @@ class _RecurringFormPageState extends State<_RecurringFormPage> {
             ),
             const SizedBox(height: 16),
             // Items
-            Text(tr('recurring.items'),
-              style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600)),
+            Text(tr('recurring.items'), style: theme.textTheme.titleSmall),
             const SizedBox(height: 8),
             ...List.generate(_items.length, (i) => _buildItemRow(theme, i)),
             TextButton.icon(
@@ -404,8 +409,7 @@ class _RecurringFormPageState extends State<_RecurringFormPage> {
                 child: _isSaving
                     ? const SizedBox(width: 20, height: 20,
                         child: CircularProgressIndicator(strokeWidth: 2))
-                    : Text(isEdit ? tr('recurring.save_edit') : tr('recurring.save'),
-                        style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600)),
+                    : Text(isEdit ? tr('recurring.save_edit') : tr('recurring.save')),
               ),
             ),
           ],
@@ -439,6 +443,7 @@ class _RecurringFormPageState extends State<_RecurringFormPage> {
           if (_items.length > 1)
             IconButton(
               icon: const Icon(Icons.close, size: 18),
+              tooltip: tr('common.delete'),
               onPressed: () => setState(() => _items.removeAt(index)),
             ),
         ],
