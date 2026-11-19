@@ -1,24 +1,48 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import '../main.dart';
 import '../models/catalog_model.dart';
+import '../models/faktur_model.dart';
 import '../models/history_model.dart';
+import '../models/reminder_model.dart';
 import '../models/settings_model.dart';
 import '../models/struk_model.dart';
-import '../models/reminder_model.dart';
 import '../services/catalog_service.dart';
 import '../services/history_service.dart';
-import '../services/reminder_service.dart';
+import '../services/locale_service.dart';
 import '../services/settings_service.dart';
 import '../services/struk_pdf_service.dart';
 import '../services/subscription_service.dart';
+import '../widgets/catalog_picker_sheet.dart';
+import '../widgets/item_edit_sheet.dart';
 import '../widgets/paywall_sheet.dart';
+import '../widgets/total_bar.dart';
+import 'document_ready_page.dart';
 import 'pdf_preview_page.dart';
 
-class StrukPage extends StatefulWidget {
+/// Receipts keep the green accent: #047857 under white text (5.48:1), or
+/// #34D399 under the dark theme's #0F1117 onPrimary (9.82:1). The input
+/// theme hard-codes blue focus, so that is swapped too.
+ThemeData _strukTheme(ThemeData base) {
+  final green = base.brightness == Brightness.dark
+      ? AppColors.strukGreenSoft
+      : AppColors.strukGreen;
+  final input = base.inputDecorationTheme;
+  return base.copyWith(
+    colorScheme: base.colorScheme.copyWith(primary: green, secondary: green),
+    inputDecorationTheme: input.copyWith(
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: green, width: 2),
+      ),
+      floatingLabelStyle: input.floatingLabelStyle?.copyWith(color: green),
+    ),
+  );
+}
+
+class StrukPage extends StatelessWidget {
   final HistoryEntry? initialEntry;
   final List<ReminderItem>? reminderItems;
   final String? reminderContactName;
@@ -29,22 +53,52 @@ class StrukPage extends StatefulWidget {
     this.reminderContactName,
   });
 
+  // The form's state sits below this Theme, so the sheets and dialogs it
+  // opens are green as well.
   @override
-  State<StrukPage> createState() => _StrukPageState();
+  Widget build(BuildContext context) => Theme(
+        data: _strukTheme(Theme.of(context)),
+        child: _StrukForm(
+          initialEntry: initialEntry,
+          reminderItems: reminderItems,
+          reminderContactName: reminderContactName,
+        ),
+      );
 }
 
-class _StrukPageState extends State<StrukPage> {
-  final _formKey = GlobalKey<FormState>();
-  final _struk = StrukModel();
+class _StrukForm extends StatefulWidget {
+  final HistoryEntry? initialEntry;
+  final List<ReminderItem>? reminderItems;
+  final String? reminderContactName;
+  const _StrukForm({
+    this.initialEntry,
+    this.reminderItems,
+    this.reminderContactName,
+  });
 
+  @override
+  State<_StrukForm> createState() => _StrukFormState();
+}
+
+class _StrukFormState extends State<_StrukForm> {
+  final _struk = StrukModel();
   SettingsModel _settings = SettingsModel();
 
-  final _nomorStrukCtrl = TextEditingController();
-  final List<_ItemCtrls> _itemCtrls = [];
+  final _nomorCtrl = TextEditingController();
   final _kasirCtrl = TextEditingController();
   final _diskonCtrl = TextEditingController();
   final _bayarCtrl = TextEditingController();
   final _catatanCtrl = TextEditingController();
+
+  // Same split as the invoice form: typing happens in sheets or the cash
+  // field, so only these listeners rebuild, never the whole page.
+  final _items = ValueNotifier<List<ItemStruk>>([]);
+  final _total = ValueNotifier<double>(0);
+  final _paid = ValueNotifier<double>(0);
+
+  bool _isLoading = true;
+  bool _isDirty = false;
+  bool _isGenerating = false;
 
   NumberFormat get _currency => NumberFormat.currency(
         locale: _settings.currencyLocale,
@@ -52,13 +106,18 @@ class _StrukPageState extends State<StrukPage> {
         decimalDigits: 0,
       );
 
-  bool _isLoading = true;
-  bool _isDirty = false;
+  String get _dateLocale => LocaleService.isEn ? 'en_US' : 'id_ID';
 
   @override
   void initState() {
     super.initState();
+    _items.addListener(_recalcTotal);
     _loadSettings();
+  }
+
+  void _recalcTotal() {
+    _struk.items = _items.value;
+    _total.value = _struk.total;
   }
 
   String _fmtQty(double v) =>
@@ -76,65 +135,40 @@ class _StrukPageState extends State<StrukPage> {
     final s = await SettingsService.load();
     final nomorStruk =
         await SettingsService.generateStrukNumber(prefix: s.strukPrefix);
-    if (mounted) {
-      setState(() {
-        _settings = s;
-        _struk.namaToko = s.namaToko;
-        _struk.alamatToko = s.alamat;
-        _struk.teleponToko = s.telepon;
+    if (!mounted) return;
+    setState(() {
+      _settings = s;
+      _struk.namaToko = s.namaToko;
+      _struk.alamatToko = s.alamat;
+      _struk.teleponToko = s.telepon;
+      _nomorCtrl.text = nomorStruk;
 
-        final entry = widget.initialEntry;
-        if (entry != null) {
-          _nomorStrukCtrl.text = nomorStruk;
-          _kasirCtrl.text = entry.namaKasir ?? '';
-          _diskonCtrl.text =
-              entry.diskon != null && entry.diskon! > 0
-                  ? entry.diskon!.toInt().toString()
-                  : '';
-          _bayarCtrl.text =
-              entry.jumlahBayar != null && entry.jumlahBayar! > 0
-                  ? entry.jumlahBayar!.toInt().toString()
-                  : '';
-          _catatanCtrl.text = entry.catatan;
-          _struk.catatan = entry.catatan;
-          _struk.diskon = entry.diskon ?? 0;
-          _struk.metodeBayar = _parseMetodeBayar(entry.metodeBayar);
-          _struk.jumlahBayar = entry.jumlahBayar ?? 0;
-          _struk.items = entry.items
-              .map((i) => ItemStruk(
-                    nama: i.nama,
-                    kuantitas: i.kuantitas,
-                    satuan: i.satuan,
-                    hargaSatuan: i.hargaSatuan,
-                    diskon: i.diskon,
-                  ))
-              .toList();
-          if (_struk.items.isEmpty) _struk.items = [];
-          for (final c in _itemCtrls) {
-            c.dispose();
-          }
-          _itemCtrls.clear();
-          for (final item in _struk.items) {
-            final c = _ItemCtrls();
-            c.namaCtrl.text = item.nama;
-            c.deskripsiCtrl.text = item.deskripsi;
-            c.qtyCtrl.text = _fmtQty(item.kuantitas);
-            c.satuanCtrl.text = item.satuan;
-            c.hargaCtrl.text =
-                item.hargaSatuan > 0 ? item.hargaSatuan.toInt().toString() : '';
-            c.diskonCtrl.text =
-                item.diskon > 0 ? item.diskon.toInt().toString() : '';
-            _itemCtrls.add(c);
-          }
-        } else if (widget.reminderItems != null &&
-            widget.reminderItems!.isNotEmpty) {
-          _nomorStrukCtrl.text = nomorStruk;
-          _struk.catatan = s.footerStruk;
-          _catatanCtrl.text = s.footerStruk;
-          if (widget.reminderContactName != null) {
-            _kasirCtrl.text = widget.reminderContactName!;
-          }
-          _struk.items = widget.reminderItems!
+      final entry = widget.initialEntry;
+      final reminderItems = widget.reminderItems;
+      if (entry != null) {
+        _kasirCtrl.text = entry.namaKasir ?? '';
+        _struk.diskon = entry.diskon ?? 0;
+        _diskonCtrl.text =
+            _struk.diskon > 0 ? _struk.diskon.toInt().toString() : '';
+        _struk.metodeBayar = _parseMetodeBayar(entry.metodeBayar);
+        _paid.value = entry.jumlahBayar ?? 0;
+        _bayarCtrl.text =
+            _paid.value > 0 ? _paid.value.toInt().toString() : '';
+        _catatanCtrl.text = entry.catatan;
+        _items.value = entry.items
+            .map((i) => ItemStruk(
+                  nama: i.nama,
+                  kuantitas: i.kuantitas,
+                  satuan: i.satuan,
+                  hargaSatuan: i.hargaSatuan,
+                  diskon: i.diskon,
+                ))
+            .toList();
+      } else {
+        _catatanCtrl.text = s.footerStruk;
+        if (reminderItems != null && reminderItems.isNotEmpty) {
+          _kasirCtrl.text = widget.reminderContactName ?? '';
+          _items.value = reminderItems
               .map((i) => ItemStruk(
                     nama: i.nama,
                     kuantitas: i.kuantitas,
@@ -142,57 +176,72 @@ class _StrukPageState extends State<StrukPage> {
                     hargaSatuan: i.hargaSatuan,
                   ))
               .toList();
-          for (final c in _itemCtrls) {
-            c.dispose();
-          }
-          _itemCtrls.clear();
-          for (final item in _struk.items) {
-            final c = _ItemCtrls();
-            c.namaCtrl.text = item.nama;
-            c.qtyCtrl.text = _fmtQty(item.kuantitas);
-            c.satuanCtrl.text = item.satuan;
-            c.hargaCtrl.text =
-                item.hargaSatuan > 0 ? item.hargaSatuan.toInt().toString() : '';
-            _itemCtrls.add(c);
-          }
-        } else {
-          _struk.catatan = s.footerStruk;
-          _catatanCtrl.text = s.footerStruk;
-          _nomorStrukCtrl.text = nomorStruk;
-          _struk.items = [];
-          for (final c in _itemCtrls) {
-            c.dispose();
-          }
-          _itemCtrls.clear();
         }
-        _isLoading = false;
-      });
-    }
+      }
+      _isLoading = false;
+      _recalcTotal();
+    });
   }
 
   @override
   void dispose() {
-    _nomorStrukCtrl.dispose();
+    _nomorCtrl.dispose();
     _kasirCtrl.dispose();
     _diskonCtrl.dispose();
     _bayarCtrl.dispose();
     _catatanCtrl.dispose();
-    for (final c in _itemCtrls) {
-      c.dispose();
-    }
+    _items.dispose();
+    _total.dispose();
+    _paid.dispose();
     super.dispose();
   }
 
+  void _markDirty() {
+    if (!_isDirty) setState(() => _isDirty = true);
+  }
+
   void _syncToModel() {
-    _isDirty = true;
     _struk.namaToko = _settings.namaToko;
     _struk.alamatToko = _settings.alamat;
     _struk.teleponToko = _settings.telepon;
-    _struk.nomorStruk = _nomorStrukCtrl.text;
-    _struk.namaKasir = _kasirCtrl.text;
-    _struk.diskon = double.tryParse(_diskonCtrl.text) ?? 0;
-    _struk.jumlahBayar = double.tryParse(_bayarCtrl.text) ?? 0;
+    _struk.nomorStruk = _nomorCtrl.text.trim();
+    _struk.namaKasir = _kasirCtrl.text.trim();
+    _struk.jumlahBayar = _paid.value;
     _struk.catatan = _catatanCtrl.text;
+  }
+
+  void _showMessage(String text) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  Future<void> _editNumber() async {
+    var draft = _nomorCtrl.text;
+    final value = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(tr('receipt.number')),
+        content: TextFormField(
+          initialValue: draft,
+          autofocus: true,
+          onChanged: (v) => draft = v,
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(tr('common.cancel'))),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, draft.trim()),
+              child: Text(tr('common.save'))),
+        ],
+      ),
+    );
+    if (value == null || value.isEmpty || !mounted) return;
+    setState(() {
+      _nomorCtrl.text = value;
+      _isDirty = true;
+    });
   }
 
   Future<void> _pickDateTime() async {
@@ -208,20 +257,92 @@ class _StrukPageState extends State<StrukPage> {
       context: context,
       initialTime: TimeOfDay.fromDateTime(_struk.tanggal),
     );
-    if (pickedTime == null) return;
+    if (pickedTime == null || !mounted) return;
 
     setState(() {
-      _struk.tanggal = DateTime(
-        pickedDate.year,
-        pickedDate.month,
-        pickedDate.day,
-        pickedTime.hour,
-        pickedTime.minute,
-      );
+      _struk.tanggal = DateTime(pickedDate.year, pickedDate.month,
+          pickedDate.day, pickedTime.hour, pickedTime.minute);
+      _isDirty = true;
     });
   }
 
-  Future<void> _addItemFromCatalog() async {
+  // The item sheet edits ItemFaktur; a receipt item maps onto it one to one,
+  // and its discount travels in ItemEditResult.discount.
+  ItemFaktur _toSheetItem(ItemStruk i) => ItemFaktur(
+        namaBarang: i.nama,
+        deskripsi: i.deskripsi,
+        kuantitas: i.kuantitas,
+        satuan: i.satuan,
+        hargaSatuan: i.hargaSatuan,
+      );
+
+  ItemStruk _fromSheet(ItemEditResult r) => ItemStruk(
+        nama: r.item!.namaBarang,
+        deskripsi: r.item!.deskripsi,
+        kuantitas: r.item!.kuantitas,
+        satuan: r.item!.satuan,
+        hargaSatuan: r.item!.hargaSatuan,
+        diskon: r.discount,
+      );
+
+  Future<void> _addItem() async {
+    final result = await showItemEditSheet(context,
+        item: ItemFaktur(satuan: 'pcs'),
+        currency: _currency,
+        isNew: true,
+        discount: 0);
+    if (result == null || result.deleted) return;
+    _markDirty();
+    _items.value = [..._items.value, _fromSheet(result)];
+  }
+
+  Future<void> _editItem(int index) async {
+    final item = _items.value[index];
+    final result = await showItemEditSheet(context,
+        item: _toSheetItem(item), currency: _currency, discount: item.diskon);
+    if (result == null) return;
+    if (result.deleted) {
+      _removeItem(index);
+      return;
+    }
+    _markDirty();
+    _items.value = [..._items.value]..[index] = _fromSheet(result);
+  }
+
+  void _stepQty(int index, int delta) {
+    final item = _items.value[index];
+    if (item.kuantitas + delta < 1) return;
+    item.kuantitas += delta;
+    _markDirty();
+    // Same item objects in a new list: listeners fire, swipe keys stay.
+    _items.value = [..._items.value];
+  }
+
+  void _removeItem(int index) {
+    final list = [..._items.value];
+    final removed = list.removeAt(index);
+    _markDirty();
+    _items.value = list;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(
+        content:
+            Text(tr('invoice.item_removed').replaceAll('{name}', removed.nama)),
+        duration: const Duration(seconds: 4),
+        persist: false,
+        action: SnackBarAction(
+          label: tr('common.undo'),
+          onPressed: () {
+            if (!mounted) return;
+            final restored = [..._items.value];
+            restored.insert(index.clamp(0, restored.length), removed);
+            _items.value = restored;
+          },
+        ),
+      ));
+  }
+
+  Future<void> _addFromCatalog() async {
     final items = await CatalogService.loadAll();
     if (!mounted) return;
     final selected = await showModalBottomSheet<CatalogItem>(
@@ -230,99 +351,70 @@ class _StrukPageState extends State<StrukPage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _CatalogPickerSheet(
+      builder: (_) => CatalogPickerSheet(
         items: items,
         currencySymbol: _settings.currencySymbol,
         currencyLocale: _settings.currencyLocale,
       ),
     );
     if (selected == null) return;
-    setState(() {
-      _isDirty = true;
-      final item = ItemStruk(
+    _markDirty();
+    _items.value = [
+      ..._items.value,
+      ItemStruk(
         nama: selected.nama,
-        kuantitas: 1,
+        deskripsi: selected.deskripsi,
         satuan: selected.satuan,
         hargaSatuan: selected.hargaSatuan,
-      );
-      _struk.items.add(item);
-      final c = _ItemCtrls();
-      c.namaCtrl.text = selected.nama;
-      c.deskripsiCtrl.text = selected.deskripsi;
-      c.qtyCtrl.text = '1';
-      c.satuanCtrl.text = selected.satuan;
-      c.hargaCtrl.text =
-          selected.hargaSatuan > 0 ? selected.hargaSatuan.toInt().toString() : '';
-      _itemCtrls.add(c);
-    });
-  }
-
-  void _reorderItem(int oldIndex, int newIndex) {
-    setState(() {
-      if (newIndex > oldIndex) newIndex--;
-      final item = _struk.items.removeAt(oldIndex);
-      _struk.items.insert(newIndex, item);
-      final ctrl = _itemCtrls.removeAt(oldIndex);
-      _itemCtrls.insert(newIndex, ctrl);
-      _isDirty = true;
-    });
-  }
-
-  void _removeItem(int index) {
-    if (_struk.items.isEmpty) return;
-    final removedItem = _struk.items[index];
-    final removedCtrl = _itemCtrls[index];
-    setState(() {
-      _struk.items.removeAt(index);
-      _itemCtrls.removeAt(index);
-    });
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '"${removedItem.nama.isNotEmpty ? removedItem.nama : 'Item ${index + 1}'}" dihapus',
-        ),
-        action: SnackBarAction(
-          label: 'Undo',
-          onPressed: () {
-            setState(() {
-              final insertAt = index.clamp(0, _struk.items.length);
-              _struk.items.insert(insertAt, removedItem);
-              _itemCtrls.insert(insertAt, removedCtrl);
-            });
-          },
-        ),
-        duration: const Duration(seconds: 3),
       ),
-    );
+    ];
+  }
+
+  void _setMethod(MetodeBayar m) => setState(() {
+        _struk.metodeBayar = m;
+        _isDirty = true;
+      });
+
+  void _setPaid(double value) {
+    _bayarCtrl.text = value.round().toString();
+    _paid.value = value;
+    _markDirty();
   }
 
   Future<void> _generatePdf() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_isGenerating) return;
     _syncToModel();
-
-    // Validate items exist
-    if (_struk.items.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Tambahkan minimal 1 barang dari katalog')),
-      );
+    if (_struk.nomorStruk.isEmpty) {
+      _showMessage(tr('receipt.need_number'));
+      _editNumber();
       return;
     }
-    if (!mounted) return;
+    if (_items.value.isEmpty) {
+      _showMessage(tr('invoice.need_item'));
+      return;
+    }
 
-    // Check usage limit
-    final canCreate = await SubscriptionService.canCreateDocument();
-    if (!canCreate) {
+    setState(() => _isGenerating = true);
+    final bool saved;
+    var isPro = false;
+    try {
+      saved = await _saveDocument();
+      if (saved) isPro = await SubscriptionService.isPro();
+    } finally {
+      if (mounted) setState(() => _isGenerating = false);
+    }
+    if (!saved || !mounted) return;
+    _openReady(isPro);
+  }
+
+  /// Checks the quota, then stores the history entry.
+  /// False when the paywall blocked it.
+  Future<bool> _saveDocument() async {
+    if (!await SubscriptionService.canCreateDocument()) {
       if (mounted) showPaywallSheet(context);
-      return;
+      return false;
     }
-
     final struk = _struk;
-    final logoBytes = _settings.logoBytes;
-    final isPro = await SubscriptionService.isPro();
-    const struklFormat = PdfPageFormat(226.77, double.infinity, marginAll: 12);
-
     await HistoryService.add(HistoryEntry(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       docType: DocType.struk,
@@ -350,1137 +442,471 @@ class _StrukPageState extends State<StrukPage> {
       jumlahBayar: struk.jumlahBayar,
       kembalian: struk.kembalian,
     ));
-
-    // Track usage
     await SubscriptionService.incrementDocCount();
-
     _isDirty = false;
-    if (!mounted) return;
-    final done = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PdfPreviewPage(
-          title: 'Preview Struk',
-          filename: 'Struk_${struk.nomorStruk.replaceAll('/', '-')}.pdf',
-          buildPdf: (format) =>
-              StrukPdfService.buildBytes(struk, format,
-                  logoBytes: logoBytes,
-                  currencySymbol: _settings.currencySymbol,
-                  currencyLocale: _settings.currencyLocale,
-                  templateConfig: _settings.templateConfig,
-                  showWatermark: !isPro),
-          initialPageFormat: struklFormat,
-          canChangePageFormat: false,
-        ),
-      ),
-    );
-    if (!mounted) return;
-    await _showReminderDialog(struk);
-    if (done == true && mounted) Navigator.pop(context);
+    return true;
   }
 
-  Future<void> _showReminderDialog(StrukModel struk) async {
-    final customerName = struk.namaKasir.isNotEmpty ? struk.namaKasir : '';
-    final setReminder = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Atur Pengingat?'),
-        content: Text(customerName.isNotEmpty
-            ? 'Ingin mengatur pengingat layanan untuk $customerName?'
-            : 'Ingin mengatur pengingat untuk layanan ini?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Tidak'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Ya, Atur'),
-          ),
-        ],
+  void _openReady(bool isPro) {
+    final struk = _struk;
+    final settings = _settings;
+    final total = _currency.format(struk.total);
+    final now = DateTime.now();
+    final remindAt = defaultReminderDate(null, now);
+    final ready = DocumentReadyPage(
+      title: tr('done.receipt_ready'),
+      summary:
+          struk.namaKasir.isEmpty ? total : '${struk.namaKasir} · $total',
+      shareMessage: tr('done.receipt_message')
+          .replaceAll('{number}', struk.nomorStruk)
+          .replaceAll('{amount}', total),
+      reminderLabel: tr('done.remind_later'),
+      reminder: ReminderModel(
+        id: now.millisecondsSinceEpoch.toString(),
+        // Stored data, not UI text: same fallback the old dialog saved.
+        contactName: struk.namaKasir.isNotEmpty ? struk.namaKasir : 'Pelanggan',
+        serviceName: struk.items.isNotEmpty ? struk.items.first.nama : '',
+        reminderDate: DateUtils.dateOnly(remindAt),
+        reminderHour: remindAt.hour,
+        reminderMinute: remindAt.minute,
+        docType: ReminderDocType.struk,
+        lastItems: struk.items
+            .map((i) => ReminderItem(
+                  nama: i.nama,
+                  kuantitas: i.kuantitas,
+                  satuan: i.satuan,
+                  hargaSatuan: i.hargaSatuan,
+                ))
+            .toList(),
+      ),
+      preview: PdfPreviewPage(
+        title: tr('receipt.preview_title'),
+        filename: 'Struk_${struk.nomorStruk.replaceAll('/', '-')}.pdf',
+        buildPdf: (format) => StrukPdfService.buildBytes(struk, format,
+            logoBytes: settings.logoBytes,
+            currencySymbol: settings.currencySymbol,
+            currencyLocale: settings.currencyLocale,
+            templateConfig: settings.templateConfig,
+            showWatermark: !isPro),
+        initialPageFormat:
+            const PdfPageFormat(226.77, double.infinity, marginAll: 12),
+        canChangePageFormat: false,
       ),
     );
-    if (setReminder != true || !mounted) return;
-
-    final date = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now().add(const Duration(days: 30)),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365 * 3)),
+    // Saved already: replace the form so back and "Selesai" return to the
+    // caller. The new route sits outside StrukPage, so it gets its own green.
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (ctx) =>
+            Theme(data: _strukTheme(Theme.of(ctx)), child: ready),
+      ),
     );
-    if (date == null || !mounted) return;
-
-    final time = await showTimePicker(
-      context: context,
-      initialTime: const TimeOfDay(hour: 8, minute: 0),
-    );
-    if (time == null) return;
-
-    await ReminderService.add(ReminderModel(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      contactName: customerName.isNotEmpty ? customerName : 'Pelanggan',
-      serviceName: struk.items.isNotEmpty ? struk.items.first.nama : '',
-      reminderDate: date,
-      reminderHour: time.hour,
-      reminderMinute: time.minute,
-      docType: ReminderDocType.struk,
-      lastItems: struk.items
-          .map((i) => ReminderItem(
-                nama: i.nama,
-                kuantitas: i.kuantitas,
-                satuan: i.satuan,
-                hargaSatuan: i.hargaSatuan,
-              ))
-          .toList(),
-    ));
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Pengingat berhasil disimpan'),
-          backgroundColor: AppColors.successFor(Theme.of(context).brightness),
-        ),
-      );
-    }
   }
 
   void _resetForm() {
     setState(() {
       _isDirty = false;
-      _nomorStrukCtrl.clear();
+      _nomorCtrl.clear();
       _kasirCtrl.clear();
       _diskonCtrl.clear();
       _bayarCtrl.clear();
       _catatanCtrl.clear();
       _struk.tanggal = DateTime.now();
-      _struk.items = [];
       _struk.metodeBayar = MetodeBayar.tunai;
       _struk.diskon = 0;
-      _struk.jumlahBayar = 0;
-      for (final c in _itemCtrls) {
-        c.dispose();
-      }
-      _itemCtrls.clear();
+      _paid.value = 0;
+      _items.value = [];
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     final theme = Theme.of(context);
     final width = MediaQuery.sizeOf(context).width;
-    final isTablet = width >= 600;
-    final hPad = isTablet ? ((width - 680) / 2).clamp(24.0, 9999.0) : 16.0;
+    final hPad = width >= 600 ? ((width - 680) / 2).clamp(24.0, 9999.0) : 20.0;
 
-    return Theme(
-      data: theme.copyWith(
-        colorScheme: theme.colorScheme.copyWith(
-          primary: theme.brightness == Brightness.dark
-              ? AppColors.strukGreenSoft
-              : AppColors.strukGreen,
-          secondary: theme.brightness == Brightness.dark
-              ? AppColors.strukGreenSoft
-              : AppColors.strukGreen,
-        ),
-      ),
-      child: Builder(builder: (context) {
-        final t = Theme.of(context);
-        if (_isLoading) {
-          return const Scaffold(
-              body: Center(child: CircularProgressIndicator()));
-        }
-        return PopScope(
-          canPop: !_isDirty,
-          onPopInvokedWithResult: (didPop, _) async {
-            if (didPop) return;
-            final leave = await showDialog<bool>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: const Text('Keluar?'),
-                content:
-                    const Text('Form belum disimpan. Yakin ingin keluar?'),
-                actions: [
-                  TextButton(
-                      onPressed: () => Navigator.pop(ctx, false),
-                      child: const Text('Batal')),
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    child: const Text('Keluar',
-                        style: TextStyle(color: Colors.red)),
-                  ),
-                ],
-              ),
-            );
-            if (leave == true && context.mounted) Navigator.pop(context);
-          },
-          child: Scaffold(
-          appBar: AppBar(
-            title: const Text('Buat Struk'),
+    return PopScope(
+      canPop: !_isDirty,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final leave = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(tr('invoice.leave_title')),
+            content: Text(tr('invoice.leave_body')),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                tooltip: 'Reset Form',
-                onPressed: _resetForm,
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: Text(tr('common.cancel'))),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(tr('invoice.leave'),
+                    style: TextStyle(
+                        color: AppColors.errorFor(Theme.of(ctx).brightness))),
               ),
             ],
           ),
-          body: Form(
-            key: _formKey,
-            child: ListView(
-              padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 24),
-              children: [
-                _buildTokoBanner(t),
-                const SizedBox(height: 24),
-                _buildInfoStruk(t),
-                const SizedBox(height: 24),
-                _buildItemSection(t),
-                const SizedBox(height: 24),
-                _buildPembayaran(t, isTablet: isTablet),
-                const SizedBox(height: 24),
-                _buildRingkasan(t),
-              ],
-            ),
-          ),
-          bottomNavigationBar: SafeArea(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(hPad, 10, hPad, 8),
-              child: _buildGenerateButton(t, isTablet: isTablet),
-            ),
-          ),
-        ),
         );
-      }),
+        if (leave == true && context.mounted) Navigator.pop(context);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: tr('invoice.reset_form'),
+              onPressed: _resetForm,
+            ),
+          ],
+        ),
+        body: ListView(
+          padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 24),
+          children: [
+            _buildHeader(theme),
+            if (_settings.isEmpty) ...[
+              const SizedBox(height: 8),
+              Text(tr('invoice.store_missing'),
+                  style: theme.textTheme.bodySmall),
+            ],
+            const SizedBox(height: 24),
+            _buildItems(theme),
+            const Divider(height: 1),
+            const SizedBox(height: 24),
+            _buildPayment(theme),
+            const Divider(height: 1),
+            _buildExtrasRow(theme),
+          ],
+        ),
+        bottomNavigationBar: TotalBar(
+          total: _total,
+          currency: _currency,
+          actionLabel: tr('receipt.make'),
+          busy: _isGenerating,
+          onAction: _generatePdf,
+        ),
+      ),
     );
   }
 
-  Widget _buildTokoBanner(ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: theme.dividerTheme.color ?? Colors.grey.shade200,
+  Widget _buildHeader(ThemeData theme) {
+    final when =
+        DateFormat('d MMM, HH:mm', _dateLocale).format(_struk.tanggal);
+    return InkWell(
+      onTap: _editNumber,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(tr('receipt.new_title'), style: theme.textTheme.headlineSmall),
+            const SizedBox(height: 4),
+            Text('${_nomorCtrl.text} · $when',
+                style: theme.textTheme.bodySmall),
+          ],
         ),
       ),
-      child: Row(
+    );
+  }
+
+  Widget _buildItems(ThemeData theme) {
+    return ValueListenableBuilder<List<ItemStruk>>(
+      valueListenable: _items,
+      builder: (context, items, _) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: _settings.hasLogo
-                  ? null
-                  : theme.colorScheme.primary.withValues(alpha: 0.07),
-              borderRadius: BorderRadius.circular(10),
-              image: _settings.hasLogo
-                  ? DecorationImage(
-                      image: MemoryImage(_settings.logoBytes!),
-                      fit: BoxFit.contain)
-                  : null,
+          Text(tr('invoice.items'), style: theme.textTheme.titleMedium),
+          const SizedBox(height: 8),
+          if (items.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(tr('invoice.no_items'),
+                  style: theme.textTheme.bodySmall),
             ),
-            child: _settings.hasLogo
-                ? null
-                : Icon(Icons.storefront_outlined,
-                    color: theme.colorScheme.primary, size: 20),
+          for (var i = 0; i < items.length; i++) _itemRow(theme, items[i], i),
+          Wrap(
+            spacing: 8,
+            children: [
+              TextButton.icon(
+                onPressed: _addItem,
+                icon: const Icon(Icons.add, size: 18),
+                label: Text(tr('invoice.add_item')),
+              ),
+              TextButton(
+                onPressed: _addFromCatalog,
+                child: Text(tr('invoice.from_catalog')),
+              ),
+            ],
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _settings.namaToko.isEmpty
-                      ? 'Nama toko belum diisi'
-                      : _settings.namaToko,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
-                if (_settings.alamat.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(_settings.alamat,
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.45)),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
-                ],
-              ],
-            ),
-          ),
-          Icon(Icons.lock_outline,
-              size: 14,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.2)),
         ],
       ),
     );
   }
 
-  Widget _buildInfoStruk(ThemeData theme) {
-    return _card(
-      theme,
-      title: 'Info Struk',
-      icon: Icons.receipt,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              flex: 2,
-              child: _field(
-                controller: _nomorStrukCtrl,
-                label: 'Nomor Struk',
-                hint: 'cth: STR-001',
-                required: true,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: InkWell(
-                onTap: _pickDateTime,
-                borderRadius: BorderRadius.circular(4),
-                child: InputDecorator(
-                  decoration: const InputDecoration(
-                    labelText: 'Tanggal & Waktu',
-                    suffixIcon: Icon(Icons.calendar_today, size: 18),
-                  ),
-                  child: Text(
-                    DateFormat('dd/MM/yy HH:mm').format(_struk.tanggal),
-                    style: const TextStyle(fontSize: 13),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        _field(
-          controller: _kasirCtrl,
-          label: 'Nama Kasir (opsional)',
-        ),
-      ],
-    );
-  }
-
-  Widget _buildItemSection(ThemeData theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 2, bottom: 10),
-          child: Row(
-            children: [
-              Icon(Icons.shopping_cart, size: 16,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.35)),
-              const SizedBox(width: 6),
-              Text(
-                'Daftar Barang',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                ),
-              ),
-              const Spacer(),
-              if (_struk.items.isNotEmpty)
-                Text(
-                  '${_struk.items.length} item',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
-                  ),
-                ),
-            ],
-          ),
-        ),
-
-        // Item list
-        if (_struk.items.isEmpty)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 32),
-            decoration: BoxDecoration(
-              color: theme.cardColor,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: theme.dividerTheme.color ?? Colors.grey.shade200,
-              ),
-            ),
-            child: Column(
-              children: [
-                Icon(Icons.shopping_bag_outlined,
-                    size: 36,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.15)),
-                const SizedBox(height: 10),
-                Text(
-                  'Belum ada barang',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Tambahkan dari katalog',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.25),
-                  ),
-                ),
-              ],
-            ),
-          )
-        else
-          ...List.generate(
-              _struk.items.length, (i) => _buildItemRow(i, theme)),
-
-        const SizedBox(height: 12),
-
-        // Add item button
-        SizedBox(
-          width: double.infinity,
-          height: 44,
-          child: OutlinedButton.icon(
-            onPressed: _addItemFromCatalog,
-            icon: const Icon(Icons.add_shopping_cart, size: 18),
-            label: const Text('Tambah Barang dari Katalog'),
-            style: OutlinedButton.styleFrom(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildItemRow(int index, ThemeData theme) {
-    final item = _struk.items[index];
-    final ctrls = _itemCtrls[index];
-
+  Widget _itemRow(ThemeData theme, ItemStruk item, int index) {
+    final isDark = theme.brightness == Brightness.dark;
+    final price = '${_currency.format(item.hargaSatuan)} / ${item.satuan}';
     return Dismissible(
       key: ObjectKey(item),
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 16),
-        margin: const EdgeInsets.only(bottom: 8),
-        decoration: BoxDecoration(
-          color: AppColors.errorFor(theme.brightness),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Icon(Icons.delete_outline_rounded,
-            color: Colors.white, size: 20),
+        padding: const EdgeInsets.only(right: 20),
+        color: AppColors.errorFor(theme.brightness),
+        child: Icon(Icons.delete_outline,
+            // #0F1117 on #F87171 = 6.82:1; white on #B91C1C = 6.47:1.
+            color: isDark ? const Color(0xFF0F1117) : Colors.white,
+            semanticLabel: tr('common.delete')),
       ),
-      confirmDismiss: (_) async {
-        _removeItem(index);
-        return false; // we already removed it via setState
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: theme.cardColor,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: theme.dividerTheme.color ?? Colors.grey.shade200,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Top row: name + price
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.nama,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      if (ctrls.deskripsiCtrl.text.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          ctrls.deskripsiCtrl.text,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: theme.colorScheme.onSurface
-                                .withValues(alpha: 0.45),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                      const SizedBox(height: 2),
-                      Text(
-                        '${_currency.format(item.hargaSatuan)} / ${item.satuan}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.5),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (_struk.items.length > 1) ...[
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (index > 0)
-                        GestureDetector(
-                          onTap: () => _reorderItem(index, index - 1),
-                          child: Padding(
-                            padding: const EdgeInsets.all(2),
-                            child: Icon(Icons.arrow_upward_rounded,
-                                size: 14,
-                                color: theme.colorScheme.onSurface.withValues(alpha: 0.25)),
-                          ),
-                        ),
-                      if (index < _struk.items.length - 1)
-                        GestureDetector(
-                          onTap: () => _reorderItem(index, index + 2),
-                          child: Padding(
-                            padding: const EdgeInsets.all(2),
-                            child: Icon(Icons.arrow_downward_rounded,
-                                size: 14,
-                                color: theme.colorScheme.onSurface.withValues(alpha: 0.25)),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(width: 4),
-                ],
-                Text(
-                  _currency.format(item.subtotal),
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 10),
-
-            // Bottom row: qty controls + diskon
-            Row(
-              children: [
-                // Qty stepper
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: theme.dividerTheme.color ?? Colors.grey.shade200,
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _qtyBtn(Icons.remove, () {
-                        if (item.kuantitas > 1) {
-                          setState(() {
-                            item.kuantitas--;
-                            ctrls.qtyCtrl.text = _fmtQty(item.kuantitas);
-                          });
-                        }
-                      }, theme),
-                      Container(
-                        constraints: const BoxConstraints(minWidth: 40),
-                        alignment: Alignment.center,
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Text(
-                          _fmtQty(item.kuantitas),
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      _qtyBtn(Icons.add, () {
-                        setState(() {
-                          item.kuantitas++;
-                          ctrls.qtyCtrl.text = _fmtQty(item.kuantitas);
-                        });
-                      }, theme),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-
-                // Diskon inline
-                Expanded(
-                  child: SizedBox(
-                    height: 36,
-                    child: TextFormField(
-                      controller: ctrls.diskonCtrl,
-                      decoration: InputDecoration(
-                        labelText: 'Diskon',
-                        prefixText: _settings.currencySymbol,
-                        hintText: '0',
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 8),
-                        isDense: true,
-                      ),
-                      style: const TextStyle(fontSize: 13),
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly
-                      ],
-                      onChanged: (v) {
-                        setState(() {
-                          item.diskon = double.tryParse(v) ?? 0;
-                        });
-                      },
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _qtyBtn(IconData icon, VoidCallback onTap, ThemeData theme) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
-      child: Padding(
-        padding: const EdgeInsets.all(6),
-        child: Icon(icon, size: 16,
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
-      ),
-    );
-  }
-
-  Widget _buildPembayaran(ThemeData theme, {bool isTablet = false}) {
-    final diskonField = TextFormField(
-      controller: _diskonCtrl,
-      decoration: InputDecoration(
-        labelText: 'Diskon (${_settings.currencySymbol.trim()})',
-        prefixText: _settings.currencySymbol,
-        hintText: '0',
-      ),
-      keyboardType: TextInputType.number,
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-      onChanged: (v) {
-        setState(() => _struk.diskon = double.tryParse(v) ?? 0);
-      },
-    );
-
-    final metodeBayarField = DropdownButtonFormField<MetodeBayar>(
-      initialValue: _struk.metodeBayar,
-      decoration: const InputDecoration(labelText: 'Metode Pembayaran'),
-      items: MetodeBayar.values
-          .map((m) => DropdownMenuItem(value: m, child: Text(m.label)))
-          .toList(),
-      onChanged: (v) {
-        if (v != null) setState(() => _struk.metodeBayar = v);
-      },
-    );
-
-    return _card(
-      theme,
-      title: 'Pembayaran',
-      icon: Icons.payments,
-      children: [
-        if (isTablet)
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(child: diskonField),
-              const SizedBox(width: 12),
-              Expanded(child: metodeBayarField),
-            ],
-          )
-        else ...[
-          diskonField,
-          const SizedBox(height: 12),
-          metodeBayarField,
-        ],
-        if (_struk.metodeBayar == MetodeBayar.tunai) ...[
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _bayarCtrl,
-            decoration: InputDecoration(
-              labelText: 'Jumlah Bayar (${_settings.currencySymbol.trim()})',
-              prefixText: _settings.currencySymbol,
-            ),
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            onChanged: (v) {
-              setState(() => _struk.jumlahBayar = double.tryParse(v) ?? 0);
-            },
-          ),
-        ],
-        const SizedBox(height: 12),
-        _field(
-          controller: _catatanCtrl,
-          label: 'Catatan (opsional)',
-          maxLines: 2,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRingkasan(ThemeData theme) {
-    final isKembalianVisible =
-        _struk.metodeBayar == MetodeBayar.tunai && _struk.jumlahBayar > 0;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.1),
-        ),
-      ),
-      child: Column(
-        children: [
-          _totalRow('Subtotal', _struk.subtotal, theme),
-          if (_struk.diskon > 0) ...[
-            const Divider(height: 12),
-            _totalRow('Diskon', -_struk.diskon, theme, isDiskon: true),
-          ],
-          const Divider(height: 12),
-          _totalRow('Total', _struk.total, theme, bold: true),
-          if (isKembalianVisible) ...[
-            const Divider(height: 12),
-            _totalRow('Bayar', _struk.jumlahBayar, theme),
-            const Divider(height: 12),
-            _totalRow('Kembalian', _struk.kembalian, theme, bold: true),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _totalRow(String label, double value, ThemeData theme,
-      {bool bold = false, bool isDiskon = false}) {
-    final style = TextStyle(
-      fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-      fontSize: bold ? 16 : 14,
-      color: isDiskon
-          ? AppColors.errorFor(theme.brightness)
-          : theme.colorScheme.primary,
-    );
-    final display = isDiskon
-        ? '- ${_currency.format(value.abs())}'
-        : _currency.format(value);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: style),
-        Text(display, style: style),
-      ],
-    );
-  }
-
-  Widget _buildGenerateButton(ThemeData theme, {bool isTablet = false}) {
-    final btn = SizedBox(
-      width: double.infinity,
-      height: 50,
-      child: ElevatedButton(
-        onPressed: _isLoading ? null : _generatePdf,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: theme.colorScheme.primary,
-          foregroundColor: theme.colorScheme.onPrimary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        child: const Text('Generate Struk',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-      ),
-    );
-    if (isTablet) {
-      return Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: btn,
-        ),
-      );
-    }
-    return btn;
-  }
-
-  Widget _card(
-    ThemeData theme, {
-    required String title,
-    required IconData icon,
-    required List<Widget> children,
-    Widget? trailing,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 2, bottom: 10),
+      onDismissed: (_) => _removeItem(index),
+      child: InkWell(
+        onTap: () => _editItem(index),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
           child: Row(
             children: [
-              Icon(icon, size: 16,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.35)),
-              const SizedBox(width: 6),
-              Text(
-                title,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                ),
-              ),
-              if (trailing != null) ...[
-                const Spacer(),
-                trailing,
-              ],
-            ],
-          ),
-        ),
-        ...children,
-      ],
-    );
-  }
-
-  Widget _field({
-    required TextEditingController controller,
-    required String label,
-    String? hint,
-    bool required = false,
-    int maxLines = 1,
-    TextInputType? keyboardType,
-  }) {
-    return TextFormField(
-      controller: controller,
-      decoration: InputDecoration(labelText: label, hintText: hint),
-      maxLines: maxLines,
-      keyboardType: keyboardType,
-      validator: required
-          ? (v) => (v == null || v.isEmpty) ? '$label wajib diisi' : null
-          : null,
-    );
-  }
-}
-
-class _ItemCtrls {
-  final namaCtrl = TextEditingController();
-  final deskripsiCtrl = TextEditingController();
-  final qtyCtrl = TextEditingController(text: '1');
-  final satuanCtrl = TextEditingController(text: 'pcs');
-  final hargaCtrl = TextEditingController();
-  final diskonCtrl = TextEditingController();
-
-  void dispose() {
-    namaCtrl.dispose();
-    deskripsiCtrl.dispose();
-    qtyCtrl.dispose();
-    satuanCtrl.dispose();
-    hargaCtrl.dispose();
-    diskonCtrl.dispose();
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Catalog Picker Bottom Sheet (with create-new ability)
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _CatalogPickerSheet extends StatefulWidget {
-  final List<CatalogItem> items;
-  final String currencySymbol;
-  final String currencyLocale;
-  const _CatalogPickerSheet({
-    required this.items,
-    this.currencySymbol = 'Rp ',
-    this.currencyLocale = 'id_ID',
-  });
-
-  @override
-  State<_CatalogPickerSheet> createState() => _CatalogPickerSheetState();
-}
-
-class _CatalogPickerSheetState extends State<_CatalogPickerSheet> {
-  late List<CatalogItem> _all;
-  late List<CatalogItem> _filtered;
-  final _searchCtrl = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _all = widget.items;
-    _filtered = _all;
-  }
-
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
-  }
-
-  void _filter(String q) {
-    setState(() {
-      if (q.isEmpty) {
-        _filtered = _all;
-      } else {
-        final lq = q.toLowerCase();
-        _filtered =
-            _all.where((c) => c.nama.toLowerCase().contains(lq)).toList();
-      }
-    });
-  }
-
-  Future<void> _refresh() async {
-    final items = await CatalogService.loadAll();
-    setState(() {
-      _all = items;
-      _filter(_searchCtrl.text);
-    });
-  }
-
-  Future<void> _addNew() async {
-    final namaCtrl = TextEditingController();
-    final deskripsiCtrl = TextEditingController();
-    final satuanCtrl = TextEditingController(text: 'pcs');
-    final hargaCtrl = TextEditingController();
-
-    final result = await showDialog<CatalogItem>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Tambah Barang Baru'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: namaCtrl,
-                decoration: const InputDecoration(labelText: 'Nama Barang'),
-                autofocus: true,
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: deskripsiCtrl,
-                decoration: const InputDecoration(
-                    labelText: 'Deskripsi (opsional)'),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: satuanCtrl,
-                      decoration: const InputDecoration(labelText: 'Satuan'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: hargaCtrl,
-                      decoration: const InputDecoration(labelText: 'Harga'),
-                      keyboardType: TextInputType.number,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
-          TextButton(
-            onPressed: () {
-              if (namaCtrl.text.trim().isEmpty) return;
-              final item = CatalogItem(
-                id: DateTime.now().millisecondsSinceEpoch.toString(),
-                nama: namaCtrl.text.trim(),
-                deskripsi: deskripsiCtrl.text.trim(),
-                satuan: satuanCtrl.text.trim(),
-                hargaSatuan: double.tryParse(hargaCtrl.text) ?? 0,
-              );
-              Navigator.pop(ctx, item);
-            },
-            child: const Text('Simpan & Pilih'),
-          ),
-        ],
-      ),
-    );
-    namaCtrl.dispose();
-    deskripsiCtrl.dispose();
-    satuanCtrl.dispose();
-    hargaCtrl.dispose();
-
-    if (result != null) {
-      await CatalogService.save(result);
-      if (mounted) Navigator.pop(context, result);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return DraggableScrollableSheet(
-      initialChildSize: 0.55,
-      maxChildSize: 0.85,
-      minChildSize: 0.3,
-      expand: false,
-      builder: (context, scrollController) {
-        return Container(
-          decoration: BoxDecoration(
-            color: theme.cardColor,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              Expanded(
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
+                    Text(item.nama, style: theme.textTheme.bodyLarge),
+                    const SizedBox(height: 2),
+                    Text(
+                      item.diskon > 0
+                          ? '$price · −${_currency.format(item.diskon)}'
+                          : price,
+                      style: theme.textTheme.bodySmall,
                     ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Icon(Icons.inventory_2_outlined,
-                            color: theme.colorScheme.primary, size: 20),
-                        const SizedBox(width: 8),
-                        Text('Pilih Barang',
-                            style: GoogleFonts.inter(
-                                fontSize: 16, fontWeight: FontWeight.w600)),
-                        const Spacer(),
-                        TextButton.icon(
-                          onPressed: _addNew,
-                          icon: const Icon(Icons.add, size: 16),
-                          label: const Text('Buat Baru'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: _searchCtrl,
-                      onChanged: _filter,
-                      decoration: const InputDecoration(
-                        hintText: 'Cari barang...',
-                        prefixIcon: Icon(Icons.search, size: 18),
-                      ),
-                      style: GoogleFonts.inter(fontSize: 13),
-                    ),
-                    const SizedBox(height: 8),
                   ],
                 ),
               ),
-              const Divider(height: 1),
-              Expanded(
-                child: _filtered.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.inventory_2_outlined,
-                                size: 48,
-                                color: theme.colorScheme.onSurface
-                                    .withValues(alpha: 0.15)),
-                            const SizedBox(height: 12),
-                            Text(
-                              _all.isEmpty
-                                  ? 'Belum ada barang'
-                                  : 'Tidak ditemukan',
-                              style: GoogleFonts.inter(
-                                fontSize: 14,
-                                color: theme.colorScheme.onSurface
-                                    .withValues(alpha: 0.4),
-                              ),
-                            ),
-                            if (_all.isEmpty) ...[
-                              const SizedBox(height: 6),
-                              Text(
-                                'Tap "Buat Baru" untuk menambah barang',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: theme.colorScheme.onSurface
-                                      .withValues(alpha: 0.3),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        controller: scrollController,
-                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
-                        itemCount: _filtered.length,
-                        itemBuilder: (_, i) {
-                          final item = _filtered[i];
-                          final currency = NumberFormat.currency(
-                            locale: widget.currencyLocale,
-                            symbol: widget.currencySymbol,
-                            decimalDigits: 0,
-                          );
-                          return ListTile(
-                            leading: Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.primary
-                                    .withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Icon(Icons.shopping_bag_outlined,
-                                  size: 18, color: theme.colorScheme.primary),
-                            ),
-                            title: Text(item.nama,
-                                style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500)),
-                            subtitle: Text(
-                              '${item.satuan} — ${currency.format(item.hargaSatuan)}',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                color: theme.colorScheme.onSurface
-                                    .withValues(alpha: 0.45),
-                              ),
-                            ),
-                            trailing: IconButton(
-                              icon: Icon(Icons.delete_outline,
-                                  size: 16,
-                                  color: theme.colorScheme.onSurface
-                                      .withValues(alpha: 0.3)),
-                              onPressed: () async {
-                                await CatalogService.delete(item.id);
-                                await _refresh();
-                              },
-                            ),
-                            onTap: () => Navigator.pop(context, item),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                          );
-                        },
-                      ),
+              IconButton(
+                tooltip: tr('item.qty_less'),
+                onPressed:
+                    item.kuantitas >= 2 ? () => _stepQty(index, -1) : null,
+                icon: const Icon(Icons.remove),
               ),
+              ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 32),
+                child: Text(_fmtQty(item.kuantitas),
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleSmall),
+              ),
+              IconButton(
+                tooltip: tr('item.qty_more'),
+                onPressed: () => _stepQty(index, 1),
+                icon: const Icon(Icons.add),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPayment(ThemeData theme) {
+    final primary = theme.colorScheme.primary;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(tr('receipt.payment'), style: theme.textTheme.titleMedium),
+        const SizedBox(height: 12),
+        // "Kartu" stands for debit and kredit; a kredit receipt stays kredit
+        // because tapping the already selected segment changes nothing.
+        SegmentedButton<MetodeBayar>(
+          showSelectedIcon: false,
+          segments: [
+            ButtonSegment(
+                value: MetodeBayar.tunai, label: Text(tr('receipt.cash'))),
+            ButtonSegment(
+                value: MetodeBayar.transfer,
+                label: Text(tr('receipt.transfer'))),
+            ButtonSegment(
+                value: MetodeBayar.qris, label: Text(MetodeBayar.qris.label)),
+            ButtonSegment(
+                value: MetodeBayar.debit, label: Text(tr('receipt.card'))),
+          ],
+          selected: {paymentSegment(_struk.metodeBayar)},
+          onSelectionChanged: (s) => _setMethod(s.first),
+          style: SegmentedButton.styleFrom(
+            // A tint, not a fill: the filled green belongs to "Buat struk".
+            selectedBackgroundColor: primary.withValues(alpha: 0.12),
+            selectedForegroundColor: primary,
+          ),
+        ),
+        if (_struk.metodeBayar == MetodeBayar.tunai) ...[
+          const SizedBox(height: 16),
+          TextField(
+            controller: _bayarCtrl,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: InputDecoration(
+              labelText: tr('receipt.cash_received'),
+              prefixText: _settings.currencySymbol,
+            ),
+            onChanged: (v) {
+              _paid.value = double.tryParse(v) ?? 0;
+              _markDirty();
+            },
+          ),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 8,
+            children: [
+              TextButton(
+                onPressed: () => _setPaid(_total.value),
+                child: Text(tr('receipt.exact')),
+              ),
+              // Fixed rupiah notes; they mean nothing in other currencies.
+              if (_settings.currency == 'IDR')
+                for (final amount in const [50000.0, 100000.0])
+                  TextButton(
+                    onPressed: () => _setPaid(amount),
+                    child: Text(_currency.format(amount)),
+                  ),
+            ],
+          ),
+          _buildChange(theme),
+        ],
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildChange(ThemeData theme) {
+    return ListenableBuilder(
+      listenable: Listenable.merge([_total, _paid]),
+      builder: (context, _) {
+        final change = cashChange(total: _total.value, paid: _paid.value);
+        if (change == null) return const SizedBox.shrink();
+        final short = change < 0;
+        final color = short ? AppColors.errorFor(theme.brightness) : null;
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(tr(short ? 'receipt.short' : 'receipt.change'),
+                    style: theme.textTheme.bodyLarge?.copyWith(color: color)),
+              ),
+              Text(_currency.format(change.abs()),
+                  style: theme.textTheme.titleMedium?.copyWith(color: color)),
             ],
           ),
         );
       },
     );
+  }
+
+  Widget _buildExtrasRow(ThemeData theme) {
+    final kasir = _kasirCtrl.text.trim();
+    final note = _catatanCtrl.text.trim();
+    final parts = [
+      if (_struk.diskon > 0)
+        '${tr('receipt.discount')} ${_currency.format(_struk.diskon)}',
+      if (kasir.isNotEmpty) kasir,
+      if (note.isNotEmpty) note,
+    ];
+    return InkWell(
+      onTap: _showExtrasSheet,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(tr('receipt.extras'), style: theme.textTheme.titleSmall),
+                  if (parts.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(parts.join(' · '),
+                        style: theme.textTheme.bodySmall,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis),
+                  ],
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right,
+                color: theme.colorScheme.onSurfaceVariant),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showExtrasSheet() async {
+    String snapshot() =>
+        '${_diskonCtrl.text}|${_kasirCtrl.text}|${_catatanCtrl.text}';
+    final before = snapshot();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.fromLTRB(
+              20, 0, 20, 20 + MediaQuery.viewInsetsOf(ctx).bottom),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(tr('receipt.extras_title'),
+                    style: Theme.of(ctx).textTheme.titleMedium),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _diskonCtrl,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
+                    labelText: tr('receipt.discount'),
+                    prefixText: _settings.currencySymbol,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _kasirCtrl,
+                  textCapitalization: TextCapitalization.words,
+                  decoration:
+                      InputDecoration(labelText: tr('receipt.cashier')),
+                ),
+                const SizedBox(height: 4),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(tr('receipt.date')),
+                  trailing: Text(DateFormat('d MMM yyyy, HH:mm', _dateLocale)
+                      .format(_struk.tanggal)),
+                  onTap: () async {
+                    await _pickDateTime();
+                    setSheet(() {});
+                  },
+                ),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: _catatanCtrl,
+                  maxLines: 3,
+                  decoration: InputDecoration(labelText: tr('invoice.notes')),
+                ),
+                const SizedBox(height: 20),
+                FilledButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: Text(tr('common.done'))),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (!mounted) return;
+    _struk.diskon = double.tryParse(_diskonCtrl.text) ?? 0;
+    _recalcTotal();
+    setState(() {
+      if (snapshot() != before) _isDirty = true;
+    });
   }
 }
