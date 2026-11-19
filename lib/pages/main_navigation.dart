@@ -13,6 +13,11 @@ import 'struk_page.dart';
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
 
+  /// Switch tab from a page inside MainNavigation (e.g. dashboard banner).
+  static void goToTab(BuildContext context, int index) => context
+      .findAncestorStateOfType<_MainNavigationState>()
+      ?._onNavTap(index);
+
   @override
   State<MainNavigation> createState() => _MainNavigationState();
 }
@@ -20,22 +25,18 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
   int _dueCount = 0;
-  late final PageController _pageCtrl;
 
-  // Tab 2 (Notifikasi) punya TabBarView sendiri, disable swipe di situ
-  static const _swipeDisabledTabs = {2};
+  static const _pages = [
+    DashboardPage(),
+    HistoryPage(),
+    ReminderPage(),
+    SettingsPage(),
+  ];
 
   @override
   void initState() {
     super.initState();
-    _pageCtrl = PageController();
     _loadDueCount();
-  }
-
-  @override
-  void dispose() {
-    _pageCtrl.dispose();
-    super.dispose();
   }
 
   Future<void> _loadDueCount() async {
@@ -47,21 +48,10 @@ class _MainNavigationState extends State<MainNavigation> {
     }
   }
 
-  void _onPageChanged(int index) {
+  void _onNavTap(int index) {
+    if (index == _currentIndex) return;
     setState(() => _currentIndex = index);
     if (index == 0 || index == 2) _loadDueCount();
-  }
-
-  void _onNavTap(int index) {
-    if ((index - _currentIndex).abs() > 1) {
-      _pageCtrl.jumpToPage(index);
-    } else {
-      _pageCtrl.animateToPage(
-        index,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
   }
 
   void _showCreateSheet() {
@@ -140,18 +130,25 @@ class _MainNavigationState extends State<MainNavigation> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      body: PageView(
-        controller: _pageCtrl,
-        onPageChanged: _onPageChanged,
-        physics: _swipeDisabledTabs.contains(_currentIndex)
-            ? const NeverScrollableScrollPhysics()
-            : null,
-        children: const [
-          DashboardPage(),
-          HistoryPage(),
-          ReminderPage(),
-          SettingsPage(),
-        ],
+      body: AnimatedSwitcher(
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 200),
+        switchInCurve: Easing.emphasizedDecelerate,
+        switchOutCurve: Easing.emphasizedAccelerate,
+        transitionBuilder: (child, animation) => FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            // ~8px rise on a phone-height page.
+            position: Tween(begin: const Offset(0, 0.01), end: Offset.zero)
+                .animate(animation),
+            child: child,
+          ),
+        ),
+        child: KeyedSubtree(
+          key: ValueKey(_currentIndex),
+          child: _pages[_currentIndex],
+        ),
       ),
       bottomNavigationBar: _BottomNav(
         currentIndex: _currentIndex,

@@ -9,6 +9,7 @@ import '../models/settings_model.dart';
 import '../services/history_service.dart';
 import '../services/reminder_service.dart';
 import '../services/settings_service.dart';
+import 'main_navigation.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -481,14 +482,7 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  void _navigateToSettings() {
-    // Walk up to MainNavigation's PageController via the page context
-    // Simpler: use the PageView's controller by finding it
-    final pageView = context.findAncestorWidgetOfExactType<PageView>();
-    if (pageView != null && pageView.controller != null) {
-      pageView.controller!.jumpToPage(3); // Settings tab
-    }
-  }
+  void _navigateToSettings() => MainNavigation.goToTab(context, 3);
 
   Widget _buildChart(
       ThemeData theme, List<_MonthData> monthlyData, double maxMonthly) {
