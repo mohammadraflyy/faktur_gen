@@ -268,6 +268,7 @@ const _strings = <String, List<String>>{
   'update.later': ['Nanti saja', 'Not now'],
   'update.download': ['Unduh & Perbarui', 'Download & Update'],
   'update.downloading': ['Mengunduh… {percent}%', 'Downloading… {percent}%'],
+  'update.downloading_plain': ['Mengunduh…', 'Downloading…'],
   'update.download_failed': ['Gagal mengunduh file update', 'Failed to download the update'],
   'update.available': ['Pembaruan v{version} tersedia!', 'Update v{version} available!'],
   'update.now': ['Perbarui Sekarang', 'Update Now'],

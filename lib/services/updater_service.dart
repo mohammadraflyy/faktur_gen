@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import 'locale_service.dart';
 
 class AppUpdateInfo {
@@ -38,6 +40,7 @@ class UpdaterService {
   final String repository;
 
   static const _channel = MethodChannel('faktur/native');
+  static const _readTimeout = Duration(seconds: 20);
   static const currentAppVersion =
       String.fromEnvironment('APP_VERSION', defaultValue: '1.0.0');
 
@@ -53,10 +56,11 @@ class UpdaterService {
       final request = await client.getUrl(url);
       request.headers.set('User-Agent', 'Faktura-App');
       request.headers.set('Accept', 'application/vnd.github.v3+json');
-      final response = await request.close();
+      final response = await request.close().timeout(_readTimeout);
       if (response.statusCode != 200) return null;
 
-      final body = await response.transform(utf8.decoder).join();
+      final body =
+          await response.transform(utf8.decoder).join().timeout(_readTimeout);
       final data = jsonDecode(body);
       if (data is! Map<String, dynamic>) return null;
 
@@ -65,15 +69,16 @@ class UpdaterService {
       final releaseName = data['name']?.toString() ?? tagName;
       final bodyText = data['body']?.toString() ?? '';
 
-      final apks = (data['assets'] is List ? data['assets'] as List : const [])
+      // Faktura.apk is arm64; 32-bit-only phones need Faktura-v7a.apk.
+      final abis =
+          await _channel.invokeListMethod<String>('supportedAbis') ?? const [];
+      final wantV7a = !abis.contains('arm64-v8a');
+      final asset = (data['assets'] is List ? data['assets'] as List : const [])
           .whereType<Map>()
-          .where((a) =>
-              a['name']?.toString().toLowerCase().endsWith('.apk') ?? false)
-          .toList();
-      // Prefer the arm64 build; the -v7a one is for older 32-bit phones.
-      final asset = apks.firstWhere(
-          (a) => !a['name'].toString().toLowerCase().contains('-v7a'),
-          orElse: () => apks.isEmpty ? const {} : apks.first);
+          .firstWhere((a) {
+        final name = a['name']?.toString().toLowerCase() ?? '';
+        return name.endsWith('.apk') && name.contains('-v7a') == wantV7a;
+      }, orElse: () => const {});
 
       return AppUpdateInfo(
         currentVersion: currentVersion,
@@ -87,6 +92,8 @@ class UpdaterService {
       );
     } on IOException {
       return null;
+    } on TimeoutException {
+      return null;
     } on FormatException {
       return null;
     } finally {
@@ -95,6 +102,7 @@ class UpdaterService {
   }
 
   /// Downloads the APK into the app cache and hands it to the system installer.
+  /// [onProgress] gets total <= 0 when the server sends no length.
   Future<void> downloadAndInstall({
     required String downloadUrl,
     required String fileName,
@@ -104,26 +112,30 @@ class UpdaterService {
     try {
       final request = await client.getUrl(Uri.parse(downloadUrl));
       request.headers.set('User-Agent', 'Faktura-App');
-      final response = await request.close();
+      final response = await request.close().timeout(_readTimeout);
       if (response.statusCode != 200) {
         throw HttpException(
             '${tr('update.download_failed')} (${response.statusCode})');
       }
 
       final total = response.contentLength;
-      // The FileProvider only shares the app's cache and files dirs.
-      final paths = await _channel.invokeMethod<Map<Object?, Object?>>('paths');
-      final saveFile = File('${paths!['cacheDir']}/$fileName');
+      // getTemporaryDirectory is cacheDir on Android, the FileProvider root.
+      final saveFile =
+          File('${(await getTemporaryDirectory()).path}/$fileName');
       final sink = saveFile.openWrite();
-
+      var complete = false;
       var received = 0;
-      await for (final chunk in response) {
-        sink.add(chunk);
-        received += chunk.length;
-        onProgress?.call(received, total);
+      try {
+        await for (final chunk in response.timeout(_readTimeout)) {
+          sink.add(chunk);
+          received += chunk.length;
+          onProgress?.call(received, total);
+        }
+        complete = true;
+      } finally {
+        await sink.close();
+        if (!complete) await saveFile.delete();
       }
-      await sink.flush();
-      await sink.close();
 
       await _channel.invokeMethod('installApk', {'path': saveFile.path});
     } finally {
@@ -157,61 +169,75 @@ class UpdaterService {
 Future<void> promptAppUpdate(BuildContext context,
     {bool notifyIfLatest = true}) async {
   final updater = UpdaterService();
+  final navigator = Navigator.of(context, rootNavigator: true);
 
-  showDialog<void>(
+  // Removed by route handle, so a slow or failed check can never pop the
+  // page underneath it.
+  final loader = DialogRoute<void>(
     context: context,
     barrierDismissible: false,
-    builder: (ctx) => Center(
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2)),
-              const SizedBox(width: 16),
-              Text(tr('update.checking')),
-            ],
+    builder: (ctx) => PopScope(
+      canPop: false,
+      child: Center(
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2)),
+                const SizedBox(width: 16),
+                Text(tr('update.checking')),
+              ],
+            ),
           ),
         ),
       ),
     ),
   );
+  navigator.push(loader);
 
-  final info = await updater.checkForUpdate();
-
-  if (!context.mounted) return;
-  Navigator.of(context, rootNavigator: true).pop();
-
-  if (info == null || !info.isNewer) {
-    if (notifyIfLatest) {
-      showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(tr(info == null ? 'update.check_failed' : 'update.latest')),
-          content: Text(info == null
-              ? tr('update.check_failed_desc')
-              : tr('update.latest_desc')
-                  .replaceAll('{version}', info.currentVersion)),
-          actions: [
-            FilledButton(
-                autofocus: true,
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(tr('common.close'))),
-          ],
-        ),
-      );
-    }
-    return;
+  AppUpdateInfo? info;
+  Object? error;
+  StackTrace? stack;
+  try {
+    info = await updater.checkForUpdate();
+  } catch (e, st) {
+    error = e;
+    stack = st;
+  } finally {
+    if (loader.isActive) navigator.removeRoute(loader);
   }
+
+  if (context.mounted && (info == null || !info.isNewer) && notifyIfLatest) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(tr(info == null ? 'update.check_failed' : 'update.latest')),
+        content: Text(info == null
+            ? tr('update.check_failed_desc')
+            : tr('update.latest_desc')
+                .replaceAll('{version}', info.currentVersion)),
+        actions: [
+          FilledButton(
+              autofocus: true,
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(tr('common.close'))),
+        ],
+      ),
+    );
+  }
+  // Unexpected errors (not network) still reach the framework's error log.
+  if (error != null) Error.throwWithStackTrace(error, stack!);
+  if (!context.mounted || info == null || !info.isNewer) return;
 
   showDialog<void>(
     context: context,
     barrierDismissible: false,
-    builder: (ctx) => _AppUpdateDialog(info: info, updater: updater),
+    builder: (ctx) => _AppUpdateDialog(info: info!, updater: updater),
   );
 }
 
@@ -227,13 +253,13 @@ class _AppUpdateDialog extends StatefulWidget {
 class _AppUpdateDialogState extends State<_AppUpdateDialog> {
   double? _progress;
   bool _downloading = false;
-  String? _error;
+  bool _failed = false;
 
   Future<void> _startUpdate() async {
     setState(() {
       _downloading = true;
-      _error = null;
-      _progress = 0.0;
+      _failed = false;
+      _progress = null;
     });
 
     try {
@@ -247,11 +273,11 @@ class _AppUpdateDialogState extends State<_AppUpdateDialog> {
         },
       );
       if (mounted) Navigator.pop(context);
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
         setState(() {
           _downloading = false;
-          _error = e.toString();
+          _failed = true;
         });
       }
     }
@@ -261,77 +287,83 @@ class _AppUpdateDialogState extends State<_AppUpdateDialog> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final muted = scheme.onSurfaceVariant;
-    return AlertDialog(
-      title: Row(
-        children: [
-          Icon(Icons.system_update, color: scheme.primary),
-          const SizedBox(width: 10),
-          Expanded(
-              child: Text(tr('update.title')
-                  .replaceAll('{name}', widget.info.releaseName))),
-        ],
-      ),
-      content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return PopScope(
+      canPop: !_downloading,
+      child: AlertDialog(
+        title: Row(
           children: [
-            Text(
-              tr('update.new_version')
-                  .replaceAll('{latest}', widget.info.latestVersion)
-                  .replaceAll('{current}', widget.info.currentVersion),
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 8),
-            if (widget.info.changelog.isNotEmpty) ...[
-              Text(tr('update.changelog'),
-                  style: TextStyle(fontSize: 12, color: muted)),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.all(8),
-                constraints: const BoxConstraints(maxHeight: 120),
-                decoration: BoxDecoration(
-                  color: scheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: SingleChildScrollView(
-                  child: Text(widget.info.changelog,
-                      style: const TextStyle(fontSize: 12)),
-                ),
-              ),
-              const SizedBox(height: 10),
-            ],
-            if (_downloading) ...[
-              LinearProgressIndicator(value: _progress),
-              const SizedBox(height: 6),
-              Text(
-                tr('update.downloading').replaceAll(
-                    '{percent}', '${((_progress ?? 0) * 100).toInt()}'),
-                style: TextStyle(fontSize: 12, color: muted),
-              ),
-            ],
-            if (_error != null) ...[
-              const SizedBox(height: 8),
-              Text(_error!, style: TextStyle(color: scheme.error, fontSize: 12)),
-            ],
+            Icon(Icons.system_update, color: scheme.primary),
+            const SizedBox(width: 10),
+            Expanded(
+                child: Text(tr('update.title')
+                    .replaceAll('{name}', widget.info.releaseName))),
           ],
         ),
-      ),
-      actions: [
-        if (!_downloading) ...[
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(tr('update.later')),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                tr('update.new_version')
+                    .replaceAll('{latest}', widget.info.latestVersion)
+                    .replaceAll('{current}', widget.info.currentVersion),
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              if (widget.info.changelog.isNotEmpty) ...[
+                Text(tr('update.changelog'),
+                    style: TextStyle(fontSize: 12, color: muted)),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  constraints: const BoxConstraints(maxHeight: 120),
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: SingleChildScrollView(
+                    child: Text(widget.info.changelog,
+                        style: const TextStyle(fontSize: 12)),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              if (_downloading) ...[
+                LinearProgressIndicator(value: _progress),
+                const SizedBox(height: 6),
+                Text(
+                  _progress == null
+                      ? tr('update.downloading_plain')
+                      : tr('update.downloading').replaceAll(
+                          '{percent}', '${(_progress! * 100).toInt()}'),
+                  style: TextStyle(fontSize: 12, color: muted),
+                ),
+              ],
+              if (_failed) ...[
+                const SizedBox(height: 8),
+                Text(tr('update.download_failed'),
+                    style: TextStyle(color: scheme.error, fontSize: 12)),
+              ],
+            ],
           ),
-          if (widget.info.downloadUrl != null && widget.info.fileName != null)
-            FilledButton.icon(
-              onPressed: _startUpdate,
-              icon: const Icon(Icons.download, size: 16),
-              label: Text(tr('update.download')),
+        ),
+        actions: [
+          if (!_downloading) ...[
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(tr('update.later')),
             ),
+            if (widget.info.downloadUrl != null && widget.info.fileName != null)
+              FilledButton.icon(
+                onPressed: _startUpdate,
+                icon: const Icon(Icons.download, size: 16),
+                label: Text(tr('update.download')),
+              ),
+          ],
         ],
-      ],
+      ),
     );
   }
 }
