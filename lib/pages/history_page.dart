@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import '../main.dart';
+import '../models/dashboard_summary.dart';
 import '../models/history_model.dart';
+import '../models/history_view.dart';
 import '../models/faktur_model.dart';
 import '../models/settings_model.dart';
 import '../models/struk_model.dart';
@@ -16,6 +19,7 @@ import '../pages/pdf_preview_page.dart';
 import '../pages/faktur_page.dart';
 import '../pages/struk_page.dart';
 import '../services/locale_service.dart';
+import '../widgets/status_label.dart';
 
 class HistoryPage extends StatefulWidget {
   final bool unpaidOnly;
@@ -26,14 +30,18 @@ class HistoryPage extends StatefulWidget {
   State<HistoryPage> createState() => _HistoryPageState();
 }
 
-class _HistoryPageState extends State<HistoryPage> {
+class _HistoryPageState extends State<HistoryPage>
+    with SingleTickerProviderStateMixin {
   List<HistoryEntry> _entries = [];
   List<HistoryEntry> _filtered = [];
   bool _isLoading = true;
+  bool _showLoadingText = false;
+  bool _failed = false;
+  Timer? _loadingTimer;
   final _searchCtrl = TextEditingController();
   String _searchQuery = '';
-  DocType? _typeFilter;
-  PaymentStatus? _paymentFilter;
+  late HistoryFilter _filter;
+  late final TabController _tabCtrl;
 
   SettingsModel _settings = SettingsModel();
 
@@ -43,60 +51,76 @@ class _HistoryPageState extends State<HistoryPage> {
         decimalDigits: 0,
       );
 
+  String get _dateLocale => LocaleService.isEn ? 'en_US' : 'id_ID';
+
   @override
   void initState() {
     super.initState();
-    if (widget.unpaidOnly) _paymentFilter = PaymentStatus.unpaid;
+    _filter = widget.unpaidOnly ? HistoryFilter.unpaid : HistoryFilter.all;
+    _tabCtrl = TabController(
+      length: HistoryFilter.values.length,
+      initialIndex: _filter.index,
+      vsync: this,
+    );
     _load();
   }
 
   @override
   void dispose() {
+    _loadingTimer?.cancel();
+    _tabCtrl.dispose();
     _searchCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
+    _loadingTimer?.cancel();
+    // A fast load should not flash a loading message.
+    _loadingTimer = Timer(const Duration(milliseconds: 300), () {
+      if (mounted && _isLoading) setState(() => _showLoadingText = true);
+    });
     try {
       final results = await Future.wait([
         HistoryService.load(),
         SettingsService.load(),
       ]);
-      if (mounted) {
+      if (!mounted) return;
+      setState(() {
+        _entries = results[0] as List<HistoryEntry>;
+        _settings = results[1] as SettingsModel;
+        _applyFilter();
+        _isLoading = false;
+        _failed = false;
+      });
+    } catch (e) {
+      debugPrint('[History] load failed: $e');
+      if (!mounted) return;
+      if (!_isLoading) {
+        // Failed refresh: keep the list already on screen.
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(tr('history.load_failed'))));
+      } else {
         setState(() {
-          _entries = results[0] as List<HistoryEntry>;
-          _settings = results[1] as SettingsModel;
-          _applyFilter();
           _isLoading = false;
+          _failed = true;
         });
       }
-    } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
-      debugPrint('[History] load error: $e');
+    } finally {
+      _loadingTimer?.cancel();
     }
   }
 
+  void _retry() {
+    setState(() {
+      _isLoading = true;
+      _showLoadingText = false;
+      _failed = false;
+    });
+    _load();
+  }
+
   void _applyFilter() {
-    var list = _entries;
-    if (_typeFilter != null) {
-      list = list.where((e) => e.docType == _typeFilter).toList();
-    }
-    if (_paymentFilter != null) {
-      list = list
-          .where((e) =>
-              e.docType == DocType.invoice &&
-              e.paymentStatus == _paymentFilter)
-          .toList();
-    }
-    if (_searchQuery.isNotEmpty) {
-      final q = _searchQuery.toLowerCase();
-      list = list
-          .where((e) =>
-              e.nomorDokumen.toLowerCase().contains(q) ||
-              e.namaKlien.toLowerCase().contains(q))
-          .toList();
-    }
-    _filtered = list;
+    _filtered = filterHistory(_entries, _filter, _searchQuery);
   }
 
   void _onSearch(String query) {
@@ -106,9 +130,19 @@ class _HistoryPageState extends State<HistoryPage> {
     });
   }
 
-  void _onTypeFilter(DocType? type) {
+  void _onTab(int index) {
     setState(() {
-      _typeFilter = _typeFilter == type ? null : type;
+      _filter = HistoryFilter.values[index];
+      _applyFilter();
+    });
+  }
+
+  void _clearFilter() {
+    _searchCtrl.clear();
+    _tabCtrl.index = 0;
+    setState(() {
+      _searchQuery = '';
+      _filter = HistoryFilter.all;
       _applyFilter();
     });
   }
@@ -126,30 +160,36 @@ class _HistoryPageState extends State<HistoryPage> {
     }
   }
 
-  Future<bool> _confirmDeleteEntry(HistoryEntry entry) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(tr('history.delete_title')),
-        content: Text('Hapus "${entry.nomorDokumen}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(tr('common.cancel')),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(tr('common.delete'), style: const TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-    if (confirm == true) {
-      await HistoryService.delete(entry.id);
-      await _load();
-      return true;
-    }
-    return false;
+  void _delete(HistoryEntry entry) {
+    setState(() {
+      _entries = [..._entries]..remove(entry);
+      _applyFilter();
+    });
+    // Undo waits for this, so the restore never interleaves with the delete.
+    final deleting = HistoryService.delete(entry.id).then((_) => true,
+        onError: (Object e) {
+      debugPrint('[History] delete failed: $e');
+      return false;
+    });
+    deleting.then((ok) {
+      if (!ok && mounted) _load();
+    });
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(
+        content: Text(
+            tr('history.deleted').replaceAll('{name}', entry.nomorDokumen)),
+        duration: const Duration(seconds: 4),
+        persist: false,
+        action: SnackBarAction(
+          label: tr('common.undo'),
+          // Still runs after leaving the tab; only the reload needs this page.
+          onPressed: () async {
+            if (await deleting) await HistoryService.add(entry);
+            if (mounted) _load();
+          },
+        ),
+      ));
   }
 
   void _duplicateEntry(HistoryEntry entry) {
@@ -191,379 +231,230 @@ class _HistoryPageState extends State<HistoryPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: Text(tr('history.title')),
         actions: [
           if (_entries.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.file_download_outlined, size: 20),
-              tooltip: tr('history.export_csv'),
+            TextButton(
               onPressed: _exportCsv,
+              child: Text(tr('history.export_csv')),
             ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _entries.isEmpty
-              ? RefreshIndicator(
-                  onRefresh: _load,
-                  child: ListView(
-                    children: [
-                      SizedBox(
-                        height: MediaQuery.sizeOf(context).height * 0.6,
-                        child: _buildEmptyState(),
-                      ),
-                    ],
-                  ),
-                )
-              : Column(
-                  children: [
-                    _buildSearchAndFilter(),
-                    Expanded(
-                      child: RefreshIndicator(
-                        onRefresh: _load,
-                        child: _buildList(),
-                      ),
-                    ),
-                  ],
-                ),
+      body: _body(theme),
     );
   }
 
-  Widget _buildSearchAndFilter() {
-    final theme = Theme.of(context);
+  Widget _body(ThemeData theme) {
+    if (_isLoading) {
+      return Center(
+        child: _showLoadingText
+            ? Text(tr('dashboard.loading'), style: theme.textTheme.bodySmall)
+            : const SizedBox.shrink(),
+      );
+    }
+    if (_failed) {
+      return Center(
+        child: _message(theme, tr('history.load_failed'),
+            tr('dashboard.retry'), _retry),
+      );
+    }
+    if (_entries.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 48, 20, 32),
+          children: [
+            Text(tr('history.empty'),
+                style: theme.textTheme.bodyLarge, textAlign: TextAlign.center),
+            const SizedBox(height: 4),
+            Text(tr('history.empty_sub'),
+                style: theme.textTheme.bodySmall, textAlign: TextAlign.center),
+          ],
+        ),
+      );
+    }
+    return Column(
+      children: [
+        _searchAndTabs(theme),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: _filtered.isEmpty
+                ? ListView(
+                    children: [
+                      _message(
+                        theme,
+                        _filter == HistoryFilter.unpaid && _searchQuery.isEmpty
+                            ? tr('history.no_unpaid')
+                            : tr('history.no_match'),
+                        tr('history.clear_filter'),
+                        _clearFilter,
+                      ),
+                    ],
+                  )
+                : _list(theme),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _message(
+      ThemeData theme, String text, String action, VoidCallback onTap) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 48),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          TextField(
+          Text(text,
+              style: theme.textTheme.bodyLarge, textAlign: TextAlign.center),
+          const SizedBox(height: 16),
+          FilledButton(onPressed: onTap, child: Text(action)),
+        ],
+      ),
+    );
+  }
+
+  Widget _searchAndTabs(ThemeData theme) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+          child: TextField(
             controller: _searchCtrl,
             onChanged: _onSearch,
             decoration: InputDecoration(
               hintText: tr('history.search'),
-              prefixIcon: Icon(Icons.search, size: 18,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.4)),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear, size: 16),
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _searchQuery.isEmpty
+                  ? null
+                  : IconButton(
+                      icon: const Icon(Icons.clear),
+                      tooltip: tr('history.clear_search'),
                       onPressed: () {
                         _searchCtrl.clear();
                         _onSearch('');
                       },
-                    )
-                  : null,
+                    ),
             ),
-            style: GoogleFonts.inter(fontSize: 13),
-          ),
-          const SizedBox(height: 10),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _filterChip(tr('history.all'), _typeFilter == null && _paymentFilter == null, () {
-                  setState(() { _typeFilter = null; _paymentFilter = null; _applyFilter(); });
-                }),
-                const SizedBox(width: 6),
-                _filterChip(tr('history.invoice'), _typeFilter == DocType.invoice, () => _onTypeFilter(DocType.invoice)),
-                const SizedBox(width: 6),
-                _filterChip(tr('history.receipt'), _typeFilter == DocType.struk, () => _onTypeFilter(DocType.struk)),
-                const SizedBox(width: 6),
-                _filterChip(
-                  tr('history.unpaid'),
-                  _paymentFilter == PaymentStatus.unpaid,
-                  () {
-                    setState(() {
-                      _paymentFilter = _paymentFilter == PaymentStatus.unpaid ? null : PaymentStatus.unpaid;
-                      if (_paymentFilter != null) _typeFilter = null;
-                      _applyFilter();
-                    });
-                  },
-                  color: AppColors.warningFor(theme.brightness),
-                ),
-                const SizedBox(width: 6),
-                _filterChip(
-                  tr('history.paid'),
-                  _paymentFilter == PaymentStatus.paid,
-                  () {
-                    setState(() {
-                      _paymentFilter = _paymentFilter == PaymentStatus.paid ? null : PaymentStatus.paid;
-                      if (_paymentFilter != null) _typeFilter = null;
-                      _applyFilter();
-                    });
-                  },
-                  color: AppColors.successFor(theme.brightness),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  '${_filtered.length}',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _filterChip(String label, bool selected, VoidCallback onTap, {Color? color}) {
-    final theme = Theme.of(context);
-    final accent = color ?? theme.colorScheme.primary;
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: selected
-              ? accent.withValues(alpha: 0.1)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: selected
-                ? accent.withValues(alpha: 0.3)
-                : theme.colorScheme.onSurface.withValues(alpha: 0.1),
           ),
         ),
-        child: Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: selected
-                ? accent
-                : theme.colorScheme.onSurface.withValues(alpha: 0.5),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    final theme = Theme.of(context);
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.history, size: 64,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.15)),
-          const SizedBox(height: 16),
-          Text(
-            tr('history.empty'),
-            style: GoogleFonts.inter(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            tr('history.empty_sub'),
-            style: GoogleFonts.inter(
-                fontSize: 13,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.3)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildList() {
-    final width = MediaQuery.sizeOf(context).width;
-    final isTablet = width >= 600;
-    final hPad = isTablet ? ((width - 680) / 2).clamp(16.0, 9999.0) : 12.0;
-
-    final Map<String, List<HistoryEntry>> grouped = {};
-    for (final e in _filtered) {
-      final key = DateFormat('dd MMMM yyyy', 'id_ID').format(e.createdAt);
-      grouped.putIfAbsent(key, () => []).add(e);
-    }
-
-    return ListView.builder(
-      padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 32),
-      itemCount: grouped.length,
-      itemBuilder: (context, index) {
-        final dateLabel = grouped.keys.elementAt(index);
-        final items = grouped[dateLabel]!;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (index > 0) const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-              child: Text(
-                dateLabel,
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ),
-            ...items.map((entry) => _buildEntryCard(entry)),
+        TabBar(
+          controller: _tabCtrl,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
+          // 4 + the tab's own 16 lines the first label up with the 20dp page edge.
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          dividerColor: theme.dividerTheme.color,
+          onTap: _onTab,
+          tabs: [
+            Tab(height: 48, text: tr('history.all')),
+            Tab(height: 48, text: tr('history.invoice')),
+            Tab(height: 48, text: tr('history.receipt')),
+            Tab(height: 48, text: tr('history.unpaid')),
           ],
-        );
-      },
+        ),
+      ],
     );
   }
 
-  Widget _buildEntryCard(HistoryEntry entry) {
-    final theme = Theme.of(context);
-    final isInvoice = entry.docType == DocType.invoice;
-    final color = isInvoice
-        ? (theme.brightness == Brightness.dark
-            ? AppColors.invoiceBlueSoft
-            : AppColors.invoiceBlue)
-        : (theme.brightness == Brightness.dark
-            ? AppColors.strukGreenSoft
-            : AppColors.strukGreen);
-    final icon =
-        isInvoice ? Icons.receipt_long_outlined : Icons.receipt_outlined;
-    final typeLabel = isInvoice ? 'INV' : 'STR';
-    final timeStr = DateFormat('HH:mm').format(entry.createdAt);
+  Widget _list(ThemeData theme) {
+    final width = MediaQuery.sizeOf(context).width;
+    // Keep rows a readable width on tablets.
+    final hPad = width >= 600 ? ((width - 680) / 2).clamp(20.0, 9999.0) : 20.0;
+    final now = DateTime.now();
+    return ListView(
+      padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 32),
+      children: [
+        for (final (day, entries) in groupByDay(_filtered)) ...[
+          Padding(
+            padding: const EdgeInsets.only(top: 16, bottom: 8),
+            child: Semantics(
+              header: true,
+              child: Text(_dayLabel(day, now),
+                  style: theme.textTheme.bodySmall),
+            ),
+          ),
+          const Divider(height: 1),
+          for (final e in entries) ...[
+            _entryRow(theme, e, now),
+            const Divider(height: 1),
+          ],
+        ],
+      ],
+    );
+  }
 
+  String _dayLabel(DateTime day, DateTime now) {
+    // UTC dates so a DST change cannot make a day 23 hours long.
+    final ago = DateTime.utc(now.year, now.month, now.day)
+        .difference(DateTime.utc(day.year, day.month, day.day))
+        .inDays;
+    if (ago == 0) return tr('history.today');
+    if (ago == 1) return tr('history.yesterday');
+    return DateFormat('d MMMM yyyy', _dateLocale).format(day);
+  }
+
+  Widget _entryRow(ThemeData theme, HistoryEntry e, DateTime now) {
+    final isDark = theme.brightness == Brightness.dark;
+    final type = e.docType == DocType.invoice
+        ? tr('history.invoice')
+        : tr('history.receipt');
+    final method = e.metodeBayar;
     return Dismissible(
-      key: Key(entry.id),
+      key: ValueKey(e.id),
       direction: DismissDirection.endToStart,
+      resizeDuration: MediaQuery.disableAnimationsOf(context)
+          ? null
+          : const Duration(milliseconds: 200),
       background: Container(
         alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 24),
-        margin: const EdgeInsets.only(bottom: 6),
-        decoration: BoxDecoration(
-          color: AppColors.errorFor(theme.brightness).withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(Icons.delete_outline_rounded,
-            color: AppColors.errorFor(theme.brightness), size: 22),
+        padding: const EdgeInsets.only(right: 20),
+        color: AppColors.errorFor(theme.brightness),
+        child: Icon(Icons.delete_outline,
+            // #0F1117 on #F87171 = 6.82:1; white on #B91C1C = 6.47:1.
+            color: isDark ? const Color(0xFF0F1117) : Colors.white,
+            semanticLabel: tr('common.delete')),
       ),
-      confirmDismiss: (_) => _confirmDeleteEntry(entry),
-      child: GestureDetector(
-        onTap: () => _showDetail(entry),
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 6),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-          decoration: BoxDecoration(
-            color: theme.cardColor,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: theme.dividerTheme.color ?? Colors.grey.shade200,
-            ),
-          ),
+      onDismissed: (_) => _delete(e),
+      child: InkWell(
+        onTap: () => _showDetail(e),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.07),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: color, size: 20),
-              ),
-              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          typeLabel,
-                          style: GoogleFonts.inter(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: color,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            entry.nomorDokumen,
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: theme.colorScheme.onSurface,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
+                    Text(e.namaKlien.isEmpty ? e.nomorDokumen : e.namaKlien,
+                        style: theme.textTheme.titleSmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 2),
+                    Text(
+                      [
+                        e.nomorDokumen,
+                        type,
+                        if (method != null && method.isNotEmpty) method,
+                      ].join(' · '),
+                      style: theme.textTheme.bodySmall,
                     ),
-                    if (entry.namaKlien.isNotEmpty ||
-                        (entry.docType == DocType.invoice &&
-                            entry.paymentStatus == PaymentStatus.paid)) ...[
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          if (entry.namaKlien.isNotEmpty)
-                            Flexible(
-                              child: Text(
-                                entry.namaKlien,
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: theme.colorScheme.onSurface
-                                      .withValues(alpha: 0.45),
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          if (entry.docType == DocType.invoice &&
-                              entry.paymentStatus == PaymentStatus.paid) ...[
-                            if (entry.namaKlien.isNotEmpty)
-                              const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 5, vertical: 1),
-                              decoration: BoxDecoration(
-                                color: AppColors.successFor(Theme.of(context).brightness)
-                                    .withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                tr('history.paid').toUpperCase(),
-                                style: GoogleFonts.inter(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.successFor(Theme.of(context).brightness),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    _currency.format(entry.totalAmount),
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
+                  Text(_currency.format(e.totalAmount),
+                      style: theme.textTheme.titleSmall),
                   const SizedBox(height: 2),
-                  Text(
-                    timeStr,
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      color: theme.colorScheme.onSurface
-                          .withValues(alpha: 0.3),
-                    ),
-                  ),
+                  _status(theme, e, now),
                 ],
               ),
             ],
@@ -571,6 +462,21 @@ class _HistoryPageState extends State<HistoryPage> {
         ),
       ),
     );
+  }
+
+  Widget _status(ThemeData theme, HistoryEntry e, DateTime now) {
+    final b = theme.brightness;
+    if (e.docType == DocType.struk || e.paymentStatus == PaymentStatus.paid) {
+      return StatusLabel(
+          text: tr('history.paid'), color: AppColors.successFor(b));
+    }
+    final late = e.jatuhTempo == null ? 0 : DashboardSummary.daysOverdue(e, now);
+    if (late > 0) {
+      return StatusLabel(
+          text: trN('history.days_late', late), color: AppColors.errorFor(b));
+    }
+    return StatusLabel(
+        text: tr('history.unpaid'), color: AppColors.warningFor(b));
   }
 }
 

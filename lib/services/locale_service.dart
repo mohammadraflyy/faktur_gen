@@ -89,6 +89,16 @@ const _strings = <String, List<String>>{
   'history.export_fail': ['Gagal export', 'Export failed'],
   'history.duplicate': ['Buat Ulang Dokumen', 'Duplicate Document'],
   'history.tap_to_change': ['Tap untuk ubah', 'Tap to change'],
+  'history.load_failed': ['Riwayat tidak bisa dimuat.', 'History could not be loaded.'],
+  'history.no_unpaid': ['Tidak ada invoice belum dibayar', 'No unpaid invoices'],
+  'history.no_match': ['Tidak ada dokumen yang cocok', 'No matching documents'],
+  'history.clear_filter': ['Hapus filter', 'Clear filter'],
+  'history.clear_search': ['Hapus pencarian', 'Clear search'],
+  'history.today': ['Hari ini', 'Today'],
+  'history.yesterday': ['Kemarin', 'Yesterday'],
+  'history.days_late': ['Lewat {n} hari', '{n} days overdue'],
+  'history.days_late_one': ['Lewat {n} hari', '{n} day overdue'],
+  'history.deleted': ['"{name}" dihapus', '"{name}" deleted'],
 
   // ─── Reminders ───────────────────────────────────────────────────────────
   'reminder.title': ['Pengingat Layanan', 'Service Reminders'],
