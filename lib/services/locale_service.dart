@@ -559,4 +559,5 @@ const _strings = <String, List<String>>{
   'settings.add_account': ['Tambah rekening', 'Add account'],
   'settings.plan_free': ['Gratis · {n} dari {max} dokumen bulan ini', 'Free · {n} of {max} documents this month'],
   'settings.plan_pro': ['Pro · dokumen tak terbatas', 'Pro · unlimited documents'],
+  'settings.import': ['Import', 'Import'],
 };

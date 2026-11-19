@@ -81,14 +81,14 @@ class _SandboxSubPageState extends State<SandboxSubPage> {
                       _infoRow(theme, tr('sandbox.active_reminders'),
                           '$_activeReminderCount'),
                       const SizedBox(height: 6),
-                      _infoRow(theme, tr('sandbox.scheduled_notif'),
+                      _infoRow(theme, tr('sandbox.scheduled_notifs'),
                           '$_pendingNotifCount'),
                       const SizedBox(height: 6),
                       _infoRow(theme, tr('sandbox.last_backup'),
                           _lastBackup),
                       const SizedBox(height: 4),
                       Text(
-                        tr('sandbox.auto_backup_note'),
+                        tr('sandbox.backup_note'),
                         style: GoogleFonts.inter(
                           fontSize: 11,
                           color: theme.colorScheme.onSurface
@@ -115,13 +115,13 @@ class _SandboxSubPageState extends State<SandboxSubPage> {
             theme,
             icon: Icons.notifications_active_outlined,
             title: tr('sandbox.test_notif'),
-            subtitle: tr('sandbox.test_notif_desc'),
+            subtitle: tr('sandbox.test_notif_sub'),
             onTap: () async {
               await NotificationService.showTestNotification();
               if (!mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(tr('sandbox.test_notif_sent')),
+                  content: Text(tr('sandbox.test_sent')),
                   backgroundColor:
                       AppColors.successFor(theme.brightness),
                 ),
@@ -134,13 +134,13 @@ class _SandboxSubPageState extends State<SandboxSubPage> {
             theme,
             icon: Icons.refresh_rounded,
             title: tr('sandbox.reschedule_all'),
-            subtitle: tr('sandbox.reschedule_all_desc'),
+            subtitle: tr('sandbox.reschedule_sub'),
             onTap: () async {
               await ReminderService.rescheduleNotifications();
               if (!mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(tr('sandbox.reschedule_done')),
+                  content: Text(tr('sandbox.rescheduled')),
                   backgroundColor:
                       AppColors.successFor(theme.brightness),
                 ),
@@ -153,14 +153,14 @@ class _SandboxSubPageState extends State<SandboxSubPage> {
             theme,
             icon: Icons.cancel_outlined,
             title: tr('sandbox.cancel_all'),
-            subtitle: tr('sandbox.cancel_all_desc'),
+            subtitle: tr('sandbox.cancel_sub'),
             color: Colors.red,
             onTap: () async {
               final confirm = await showDialog<bool>(
                 context: context,
                 builder: (ctx) => AlertDialog(
-                  title: Text(tr('sandbox.cancel_all_confirm')),
-                  content: Text(tr('sandbox.cancel_all_confirm_desc')),
+                  title: Text(tr('sandbox.cancel_confirm')),
+                  content: Text(tr('sandbox.cancel_warn')),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(ctx, false),
@@ -168,7 +168,7 @@ class _SandboxSubPageState extends State<SandboxSubPage> {
                     ),
                     TextButton(
                       onPressed: () => Navigator.pop(ctx, true),
-                      child: Text(tr('sandbox.yes_delete'),
+                      child: Text(tr('sandbox.cancel_yes'),
                           style: const TextStyle(color: Colors.red)),
                     ),
                   ],
@@ -177,7 +177,7 @@ class _SandboxSubPageState extends State<SandboxSubPage> {
               if (confirm != true || !mounted) return;
               await NotificationService.cancelAll();
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(tr('sandbox.all_cancelled'))),
+                SnackBar(content: Text(tr('sandbox.cancelled'))),
               );
               _loadInfo();
             },

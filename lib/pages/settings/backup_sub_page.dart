@@ -18,14 +18,14 @@ class BackupSubPage extends StatelessWidget {
             theme: theme,
             icon: Icons.upload_file_rounded,
             title: tr('settings.export_backup'),
-            subtitle: tr('settings.export_backup_desc'),
+            subtitle: tr('settings.export_backup_sub'),
             onTap: () async {
               try {
                 await BackupService.export();
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('${tr('settings.export_failed')}: $e')),
+                    SnackBar(content: Text('${tr('common.export_fail')}: $e')),
                   );
                 }
               }
@@ -36,7 +36,7 @@ class BackupSubPage extends StatelessWidget {
             theme: theme,
             icon: Icons.download_rounded,
             title: tr('settings.import_backup'),
-            subtitle: tr('settings.import_backup_desc'),
+            subtitle: tr('settings.import_backup_sub'),
             onTap: () => _confirmImport(context),
           ),
           const SizedBox(height: 16),
@@ -54,7 +54,7 @@ class BackupSubPage extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(tr('settings.import_confirm')),
-        content: Text(tr('settings.import_confirm_desc')),
+        content: Text(tr('settings.import_warn')),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -82,13 +82,13 @@ class BackupSubPage extends StatelessWidget {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(tr('settings.invalid_backup'))),
+          SnackBar(content: Text(tr('settings.import_invalid'))),
         );
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${tr('settings.import_failed')}: $e')),
+          SnackBar(content: Text('${tr('common.import_fail')}: $e')),
         );
       }
     }
