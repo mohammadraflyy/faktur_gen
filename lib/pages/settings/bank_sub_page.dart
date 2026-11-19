@@ -44,6 +44,7 @@ class _BankSubPageState extends State<BankSubPage>
         actions: [
           if (_bankCtrls.length < 3)
             IconButton(
+              tooltip: tr('settings.add_account'),
               icon: const Icon(Icons.add),
               onPressed: () => setState(() => _bankCtrls.add(_BankCtrls())),
             ),

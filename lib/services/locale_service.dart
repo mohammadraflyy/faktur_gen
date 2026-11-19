@@ -556,4 +556,5 @@ const _strings = <String, List<String>>{
   'settings.website_hint': ['cth: www.tokosaya.com', 'e.g. www.mystore.com'],
   'settings.footer_hint': ['cth: Terima kasih atas kunjungan Anda!', 'e.g. Thank you for visiting!'],
   'settings.bank_hint': ['cth: BCA, Mandiri', 'e.g. BCA, Mandiri'],
+  'settings.add_account': ['Tambah rekening', 'Add account'],
 };
