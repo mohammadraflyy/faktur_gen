@@ -194,6 +194,9 @@ class _ItemEditSheetState extends State<ItemEditSheet> {
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   decoration: InputDecoration(labelText: tr('item.discount')),
                   onChanged: (_) => setState(() {}),
+                  validator: (_) => _discount > _qty * _price
+                      ? tr('item.discount_too_big')
+                      : null,
                 ),
               ],
               const SizedBox(height: 20),

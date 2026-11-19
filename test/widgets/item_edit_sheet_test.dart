@@ -126,4 +126,19 @@ void main() {
     expect(result!.discount, 5000);
     expect(result.item!.hargaSatuan, 25000);
   });
+
+  testWidgets('discount above the item total blocks save', (tester) async {
+    final read = await _open(
+        tester, ItemFaktur(namaBarang: 'Kopi', hargaSatuan: 25000),
+        discount: 0);
+
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Diskon item'), '30000');
+    await tester.pump();
+    await tester.tap(find.text('Simpan · -Rp 5,000'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Diskon melebihi total item'), findsOneWidget);
+    expect(read(), isNull);
+  });
 }

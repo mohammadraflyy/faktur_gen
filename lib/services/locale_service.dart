@@ -519,6 +519,7 @@ const _strings = <String, List<String>>{
   'invoice.search_item': ['Cari item...', 'Search items...'],
   'invoice.catalog_empty': ['Katalog kosong. Tap "Baru" untuk menambah.', 'Catalog is empty. Tap "New" to add one.'],
   'item.discount': ['Diskon item', 'Item discount'],
+  'item.discount_too_big': ['Diskon melebihi total item', 'Discount exceeds the item total'],
   'pdf.choose_action': ['Pilih aksi', 'Choose an action'],
   'pdf.print': ['Cetak', 'Print'],
   'pdf.print_hint': ['Cetak via printer', 'Print on a printer'],
