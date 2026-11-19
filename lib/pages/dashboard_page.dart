@@ -28,6 +28,7 @@ class _DashboardPageState extends State<DashboardPage> {
   bool _isLoading = true;
   bool _showLoadingText = false;
   bool _failed = false;
+  int _selectedMonth = 5;
   Timer? _loadingTimer;
 
   NumberFormat get _currency => NumberFormat.currency(
@@ -69,6 +70,7 @@ class _DashboardPageState extends State<DashboardPage> {
         _reminders = results[2] as List<ReminderModel>;
         _isLoading = false;
         _failed = false;
+        _selectedMonth = 5;
       });
     } catch (e) {
       debugPrint('[Dashboard] load failed: $e');
@@ -134,6 +136,12 @@ class _DashboardPageState extends State<DashboardPage> {
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
             children: [
               _header(theme),
+              if (_settings.namaToko.isEmpty) ...[
+                const SizedBox(height: 24),
+                const Divider(height: 1),
+                _storeBanner(theme),
+                const Divider(height: 1),
+              ],
               const SizedBox(height: 40),
               if (_entries.isEmpty)
                 _message(theme, tr('dashboard.empty'),
@@ -144,10 +152,12 @@ class _DashboardPageState extends State<DashboardPage> {
                 _income(theme, summary),
               ],
               if (_reminders.isNotEmpty) ...[
-                const SizedBox(height: 32),
-                const Divider(height: 1),
-                _nextReminder(theme, _reminders.first),
-                const Divider(height: 1),
+                const SizedBox(height: 40),
+                _reminderList(theme),
+              ],
+              if (_entries.isNotEmpty) ...[
+                const SizedBox(height: 40),
+                _recent(theme),
               ],
             ],
           ),
@@ -184,6 +194,34 @@ class _DashboardPageState extends State<DashboardPage> {
           style: theme.textTheme.headlineSmall,
         ),
       ],
+    );
+  }
+
+  Widget _storeBanner(ThemeData theme) {
+    return InkWell(
+      onTap: () => MainNavigation.goToTab(context, 3),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Row(
+          children: [
+            const Icon(Icons.storefront_outlined),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(tr('dashboard.setup_store'),
+                      style: theme.textTheme.titleSmall),
+                  const SizedBox(height: 2),
+                  Text(tr('dashboard.setup_store_sub'),
+                      style: theme.textTheme.bodySmall),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right),
+          ],
+        ),
+      ),
     );
   }
 
@@ -282,89 +320,205 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget _income(ThemeData theme, DashboardSummary s) {
     final monthName = DateFormat('MMMM', _dateLocale);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
+    final m = s.months[_selectedMonth];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(monthName.format(s.thisMonth.month),
-                  style: theme.textTheme.titleMedium),
-              const SizedBox(height: 8),
-              Text(_currency.format(s.thisMonth.total),
-                  style: theme.textTheme.headlineSmall),
-              const SizedBox(height: 4),
-              Text(
-                '${tr('dashboard.income')} · '
-                '${monthName.format(s.lastMonth.month)} '
-                '${_currency.format(s.lastMonth.total)}',
-                style: theme.textTheme.bodySmall,
-              ),
-            ],
-          ),
+        Text(monthName.format(s.thisMonth.month),
+            style: theme.textTheme.titleMedium),
+        const SizedBox(height: 8),
+        Text(_currency.format(s.thisMonth.total),
+            style: theme.textTheme.headlineSmall),
+        const SizedBox(height: 4),
+        Text(
+          '${tr('dashboard.income')} · '
+          '${monthName.format(s.lastMonth.month)} '
+          '${_currency.format(s.lastMonth.total)}',
+          style: theme.textTheme.bodySmall,
         ),
-        const SizedBox(width: 16),
-        _miniBars(theme, s.months),
+        const SizedBox(height: 2),
+        Text(
+          '${trN('dashboard.invoice_count', s.thisMonth.invoices)} · '
+          '${trN('dashboard.receipt_count', s.thisMonth.struks)}',
+          style: theme.textTheme.bodySmall,
+        ),
+        const SizedBox(height: 20),
+        _chart(theme, s.months),
+        const SizedBox(height: 8),
+        Text(
+          '${monthName.format(m.month)} · '
+          '${trN('dashboard.invoice_count', m.invoices)} · '
+          '${trN('dashboard.receipt_count', m.struks)} · '
+          '${_currency.format(m.total)}',
+          style: theme.textTheme.bodySmall,
+        ),
       ],
     );
   }
 
-  Widget _miniBars(ThemeData theme, List<MonthTotal> months) {
+  Widget _chart(ThemeData theme, List<MonthTotal> months) {
     final max = months.fold<double>(0, (m, e) => e.total > m ? e.total : m);
     final muted = theme.colorScheme.onSurface.withValues(alpha: 0.47);
-    return Semantics(
-      label: tr('dashboard.six_months'),
-      excludeSemantics: true,
-      child: Column(
-        children: [
-          SizedBox(
-            height: 48,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                for (var i = 0; i < months.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 6),
-                  Container(
-                    width: 16,
-                    height: max == 0 ? 4 : 4 + 44 * months[i].total / max,
-                    decoration: BoxDecoration(
-                      color: i == months.length - 1
-                          ? theme.colorScheme.primary
-                          : muted,
-                      borderRadius: BorderRadius.circular(3),
+    final monthName = DateFormat('MMMM', _dateLocale);
+    final shortName = DateFormat('MMM', _dateLocale);
+    return Row(
+      children: [
+        for (var i = 0; i < months.length; i++)
+          Expanded(
+            child: Semantics(
+              button: true,
+              selected: i == _selectedMonth,
+              label: '${monthName.format(months[i].month)}, '
+                  '${_currency.format(months[i].total)}',
+              excludeSemantics: true,
+              child: InkWell(
+                onTap: () => setState(() => _selectedMonth = i),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 48),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Column(
+                      children: [
+                        SizedBox(
+                          height: 72,
+                          child: Align(
+                            alignment: Alignment.bottomCenter,
+                            child: Container(
+                              width: 20,
+                              height: max == 0
+                                  ? 4
+                                  : 4 + 68 * months[i].total / max,
+                              decoration: BoxDecoration(
+                                color: i == _selectedMonth
+                                    ? theme.colorScheme.primary
+                                    : muted,
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(shortName.format(months[i].month),
+                            style: theme.textTheme.bodySmall),
+                      ],
                     ),
                   ),
-                ],
-              ],
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 6),
-          Text(tr('dashboard.six_months'), style: theme.textTheme.bodySmall),
+      ],
+    );
+  }
+
+  Widget _reminderList(ThemeData theme) {
+    final error = AppColors.errorFor(theme.brightness);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(tr('dashboard.upcoming_reminders'),
+            style: theme.textTheme.titleMedium),
+        const SizedBox(height: 12),
+        const Divider(height: 1),
+        for (final r in _reminders.take(3)) ...[
+          _reminderRow(theme, r, error),
+          const Divider(height: 1),
         ],
+        if (_reminders.length > 3)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: () => MainNavigation.goToTab(context, 2),
+              child: Text(trN('dashboard.see_all', _reminders.length)),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _reminderRow(ThemeData theme, ReminderModel r, Color error) {
+    return InkWell(
+      onTap: () => MainNavigation.goToTab(context, 2),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(r.contactName,
+                      style: theme.textTheme.titleSmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                  if (r.serviceName.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(r.serviceName, style: theme.textTheme.bodySmall),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            if (r.isOverdue)
+              StatusLabel(text: tr('dashboard.overdue'), color: error)
+            else if (r.isDue)
+              StatusLabel(
+                  text: tr('dashboard.today'),
+                  color: theme.colorScheme.primary)
+            else
+              Text(DateFormat('d MMM', _dateLocale).format(r.reminderDate),
+                  style: theme.textTheme.bodySmall),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _nextReminder(ThemeData theme, ReminderModel r) {
+  Widget _recent(ThemeData theme) {
+    final recent = [..._entries]
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(tr('dashboard.recent'), style: theme.textTheme.titleMedium),
+        const SizedBox(height: 12),
+        const Divider(height: 1),
+        for (final e in recent.take(3)) ...[
+          _recentRow(theme, e),
+          const Divider(height: 1),
+        ],
+      ],
+    );
+  }
+
+  Widget _recentRow(ThemeData theme, HistoryEntry e) {
     return InkWell(
-      onTap: () => MainNavigation.goToTab(context, 2),
+      onTap: () => MainNavigation.goToTab(context, 1),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.symmetric(vertical: 14),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: Text(
-                tr('dashboard.reminder_prefix')
-                    .replaceAll('{name}', r.contactName),
-                style: theme.textTheme.bodyLarge,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(e.namaKlien.isEmpty ? e.nomorDokumen : e.namaKlien,
+                      style: theme.textTheme.titleSmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${e.nomorDokumen} · ${e.docType == DocType.invoice ? tr('dashboard.invoice') : tr('dashboard.receipt')}',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
               ),
             ),
             const SizedBox(width: 12),
-            Text(DateFormat('d MMM', _dateLocale).format(r.reminderDate),
-                style: theme.textTheme.bodySmall),
+            Text(_currency.format(e.totalAmount),
+                style: theme.textTheme.titleSmall),
           ],
         ),
       ),

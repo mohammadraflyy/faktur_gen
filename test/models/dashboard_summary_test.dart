@@ -68,6 +68,18 @@ void main() {
     expect(s.months.fold<double>(0, (a, m) => a + m.total), 550);
   });
 
+  test('month counts documents by type, any payment status', () {
+    final s = DashboardSummary.from([
+      _e(amount: 100, created: DateTime(2026, 11, 2)),
+      _e(amount: 200, status: PaymentStatus.paid, created: DateTime(2026, 11, 3)),
+      _e(amount: 300, type: DocType.struk, created: DateTime(2026, 11, 4)),
+      _e(amount: 400, type: DocType.struk, created: DateTime(2026, 11, 5)),
+    ], now);
+    expect(s.thisMonth.invoices, 2);
+    expect(s.thisMonth.struks, 2);
+    expect(s.thisMonth.total, 900);
+  });
+
   test('January wraps to the previous year', () {
     final s = DashboardSummary.from([
       _e(amount: 40, type: DocType.struk, created: DateTime(2026, 12, 20)),

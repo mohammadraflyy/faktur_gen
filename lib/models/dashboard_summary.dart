@@ -4,7 +4,10 @@ import 'history_model.dart';
 class MonthTotal {
   final DateTime month; // first day of the month
   final double total;
-  const MonthTotal(this.month, this.total);
+  final int invoices; // created this month, any payment status
+  final int struks;
+  const MonthTotal(this.month, this.total,
+      {this.invoices = 0, this.struks = 0});
 }
 
 /// Numbers shown on Beranda, computed from history without any UI.
@@ -46,14 +49,17 @@ class DashboardSummary {
   // Receipts are paid at the counter; invoices count once marked paid.
   // The paid date is not stored, so createdAt decides the month.
   static MonthTotal _monthTotal(List<HistoryEntry> entries, DateTime month) {
-    final total = entries
+    final inMonth = entries
         .where((e) =>
-            e.createdAt.year == month.year &&
-            e.createdAt.month == month.month &&
-            (e.docType == DocType.struk ||
-                e.paymentStatus == PaymentStatus.paid))
+            e.createdAt.year == month.year && e.createdAt.month == month.month)
+        .toList();
+    final total = inMonth
+        .where((e) =>
+            e.docType == DocType.struk || e.paymentStatus == PaymentStatus.paid)
         .fold(0.0, (s, e) => s + e.totalAmount);
-    return MonthTotal(month, total);
+    final struks = inMonth.where((e) => e.docType == DocType.struk).length;
+    return MonthTotal(month, total,
+        invoices: inMonth.length - struks, struks: struks);
   }
 
   MonthTotal get thisMonth => months.last;
