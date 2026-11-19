@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/settings_model.dart';
+import '../services/locale_service.dart';
 import '../services/settings_service.dart';
 import '../widgets/app_logo.dart';
 
@@ -56,18 +56,23 @@ class _OnboardingPageState extends State<OnboardingPage> {
   void _next() {
     if (_currentPage == 0 && _namaCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nama toko wajib diisi')),
+        SnackBar(content: Text(tr('onboarding.name_required'))),
       );
       return;
     }
-    _pageCtrl.nextPage(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
+    _goTo(_currentPage + 1);
   }
 
-  void _back() {
-    _pageCtrl.previousPage(
+  void _back() => _goTo(_currentPage - 1);
+
+  // animateToPage asserts a non-zero duration, so jump when animations are off.
+  void _goTo(int page) {
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _pageCtrl.jumpToPage(page);
+      return;
+    }
+    _pageCtrl.animateToPage(
+      page,
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
     );
@@ -103,12 +108,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
             const SizedBox(height: 12),
             ListTile(
               leading: const Icon(Icons.photo_library),
-              title: const Text('Galeri Foto'),
+              title: Text(tr('settings.gallery')),
               onTap: () => Navigator.pop(context, ImageSource.gallery),
             ),
             ListTile(
               leading: const Icon(Icons.camera_alt),
-              title: const Text('Kamera'),
+              title: Text(tr('settings.camera')),
               onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
             const SizedBox(height: 8),
@@ -143,14 +148,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 padding: const EdgeInsets.fromLTRB(0, 8, 16, 0),
                 child: TextButton(
                   onPressed: _skip,
-                  child: Text(
-                    'Lewati',
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      color: theme.colorScheme.onSurface
-                          .withValues(alpha: 0.45),
-                    ),
-                  ),
+                  child: Text(tr('onboarding.skip')),
                 ),
               ),
             ),
@@ -196,13 +194,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
                           child: CircularProgressIndicator(
                               strokeWidth: 2),
                         )
-                      : Text(
-                          _currentPage == 2 ? 'Mulai Sekarang' : 'Lanjut',
-                          style: GoogleFonts.inter(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                      : Text(_currentPage == 2
+                          ? tr('onboarding.start')
+                          : tr('onboarding.next')),
                 ),
               ),
             ),
@@ -218,19 +212,20 @@ class _OnboardingPageState extends State<OnboardingPage> {
       child: Row(
         children: [
           if (_currentPage > 0)
-            GestureDetector(
-              onTap: _back,
-              child: Icon(Icons.arrow_back_rounded,
-                  size: 22,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+            IconButton(
+              onPressed: _back,
+              tooltip: tr('onboarding.back'),
+              icon: const Icon(Icons.arrow_back_rounded),
             )
           else
-            const SizedBox(width: 22),
+            const SizedBox(width: 48),
           const Spacer(),
           ...List.generate(3, (i) {
             final isActive = i == _currentPage;
             return AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
+              duration: MediaQuery.disableAnimationsOf(context)
+                  ? Duration.zero
+                  : const Duration(milliseconds: 250),
               margin: const EdgeInsets.symmetric(horizontal: 3),
               width: isActive ? 24 : 8,
               height: 8,
@@ -243,7 +238,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
             );
           }),
           const Spacer(),
-          const SizedBox(width: 22),
+          const SizedBox(width: 48),
         ],
       ),
     );
@@ -259,29 +254,22 @@ class _OnboardingPageState extends State<OnboardingPage> {
         Center(child: AppLogo(size: 64)),
         const SizedBox(height: 24),
         Text(
-          'Atur Profil Toko',
+          tr('onboarding.profile_title'),
           textAlign: TextAlign.center,
-          style: GoogleFonts.inter(
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-            color: theme.colorScheme.onSurface,
-          ),
+          style: theme.textTheme.headlineSmall,
         ),
         const SizedBox(height: 6),
         Text(
-          'Informasi ini akan muncul di invoice dan struk',
+          tr('onboarding.profile_sub'),
           textAlign: TextAlign.center,
-          style: GoogleFonts.inter(
-            fontSize: 14,
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-          ),
+          style: theme.textTheme.bodySmall,
         ),
         const SizedBox(height: 32),
         TextFormField(
           controller: _namaCtrl,
-          decoration: const InputDecoration(
-            labelText: 'Nama Toko / Perusahaan *',
-            prefixIcon: Icon(Icons.storefront_outlined, size: 20),
+          decoration: InputDecoration(
+            labelText: tr('onboarding.name_label'),
+            prefixIcon: const Icon(Icons.storefront_outlined, size: 20),
           ),
           textCapitalization: TextCapitalization.words,
           autofocus: true,
@@ -289,18 +277,18 @@ class _OnboardingPageState extends State<OnboardingPage> {
         const SizedBox(height: 16),
         TextFormField(
           controller: _alamatCtrl,
-          decoration: const InputDecoration(
-            labelText: 'Alamat (opsional)',
-            prefixIcon: Icon(Icons.location_on_outlined, size: 20),
+          decoration: InputDecoration(
+            labelText: tr('onboarding.address_label'),
+            prefixIcon: const Icon(Icons.location_on_outlined, size: 20),
           ),
           maxLines: 2,
         ),
         const SizedBox(height: 16),
         TextFormField(
           controller: _teleponCtrl,
-          decoration: const InputDecoration(
-            labelText: 'No. Telepon (opsional)',
-            prefixIcon: Icon(Icons.phone_outlined, size: 20),
+          decoration: InputDecoration(
+            labelText: tr('onboarding.phone_label'),
+            prefixIcon: const Icon(Icons.phone_outlined, size: 20),
           ),
           keyboardType: TextInputType.phone,
         ),
@@ -317,23 +305,15 @@ class _OnboardingPageState extends State<OnboardingPage> {
         children: [
           const Spacer(flex: 1),
           Text(
-            'Tambahkan Logo',
+            tr('onboarding.logo_title'),
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: theme.colorScheme.onSurface,
-            ),
+            style: theme.textTheme.headlineSmall,
           ),
           const SizedBox(height: 6),
           Text(
-            'Logo akan tampil di header dokumen\nBisa ditambahkan nanti di Pengaturan',
+            tr('onboarding.logo_sub'),
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-              height: 1.5,
-            ),
+            style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: 32),
           GestureDetector(
@@ -366,13 +346,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
                             size: 36,
                             color: theme.colorScheme.onSurfaceVariant),
                         const SizedBox(height: 6),
-                        Text(
-                          'Pilih Logo',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
+                        Text(tr('onboarding.pick_logo'),
+                            style: theme.textTheme.bodySmall),
                       ],
                     ),
             ),
@@ -383,7 +358,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
               child: TextButton.icon(
                 onPressed: () => setState(() => _settings.logoBytes = null),
                 icon: const Icon(Icons.close, size: 16),
-                label: const Text('Hapus'),
+                label: Text(tr('common.delete')),
               ),
             ),
           const Spacer(flex: 2),
@@ -412,23 +387,15 @@ class _OnboardingPageState extends State<OnboardingPage> {
           ),
           const SizedBox(height: 24),
           Text(
-            'Siap Digunakan!',
+            tr('onboarding.done_title'),
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: theme.colorScheme.onSurface,
-            ),
+            style: theme.textTheme.headlineSmall,
           ),
           const SizedBox(height: 8),
           Text(
-            'Kamu bisa langsung buat invoice atau struk.\nSemua pengaturan bisa diubah nanti.',
+            tr('onboarding.done_sub'),
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-              height: 1.5,
-            ),
+            style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: 24),
           // Preview card
@@ -471,22 +438,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       Text(
                         _namaCtrl.text.isNotEmpty
                             ? _namaCtrl.text
-                            : 'Toko Anda',
-                        style: GoogleFonts.inter(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: theme.colorScheme.onSurface,
-                        ),
+                            : tr('onboarding.your_store'),
+                        style: theme.textTheme.titleSmall,
                       ),
                       if (_alamatCtrl.text.isNotEmpty) ...[
                         const SizedBox(height: 2),
                         Text(
                           _alamatCtrl.text,
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            color: theme.colorScheme.onSurface
-                                .withValues(alpha: 0.5),
-                          ),
+                          style: theme.textTheme.bodySmall,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
