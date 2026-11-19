@@ -652,17 +652,15 @@ class _DetailSheetState extends State<_DetailSheet> {
             ],
 
             const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: FilledButton.icon(
-                onPressed: () {
-                  Navigator.pop(context);
-                  onDuplicate?.call();
-                },
-                icon: const Icon(Icons.copy_rounded, size: 18),
-                label: Text(tr('history.duplicate')),
-              ),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48)),
+              onPressed: () {
+                Navigator.pop(context);
+                onDuplicate?.call();
+              },
+              icon: const Icon(Icons.copy_rounded, size: 18),
+              label: Text(tr('history.duplicate')),
             ),
           ],
         );

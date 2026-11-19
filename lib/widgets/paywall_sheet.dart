@@ -146,7 +146,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
             Container(
               width: 40, height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey[400],
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),

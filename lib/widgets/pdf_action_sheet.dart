@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../main.dart';
 import '../services/locale_service.dart';
 
 enum PdfAction { print, download, whatsapp }
@@ -55,7 +54,7 @@ class _PdfActionSheet extends StatelessWidget {
                     icon: Icons.download,
                     label: tr('common.save'),
                     sublabel: tr('pdf.save_hint'),
-                    color: AppColors.successFor(theme.brightness),
+                    color: theme.colorScheme.primary,
                     onTap: () => Navigator.pop(context, PdfAction.download),
                   ),
                 ),

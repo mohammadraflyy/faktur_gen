@@ -304,7 +304,7 @@ class _FakturPageState extends State<FakturPage> {
     var isPro = false;
     try {
       saved = await _saveDocument();
-      // Stay busy until the preview opens, so a second tap cannot save twice.
+      // Stay busy until the ready screen opens, so a second tap cannot save twice.
       if (saved) isPro = await SubscriptionService.isPro();
     } finally {
       if (mounted) setState(() => _isGenerating = false);

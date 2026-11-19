@@ -69,7 +69,7 @@ class _SettingsPageState extends State<SettingsPage> {
   // Free users get the paywall instead of a Pro page.
   void _pushPro(Widget page) {
     if (!_sub.isPro) {
-      showPaywallSheet(context);
+      showPaywallSheet(context).then((_) => _load());
       return;
     }
     _push(page);

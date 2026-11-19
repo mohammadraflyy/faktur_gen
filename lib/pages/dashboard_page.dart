@@ -465,7 +465,7 @@ class _DashboardPageState extends State<DashboardPage> {
             else if (r.isDue)
               StatusLabel(
                   text: tr('dashboard.today'),
-                  color: theme.colorScheme.primary)
+                  color: AppColors.warningFor(theme.brightness))
             else
               Text(DateFormat('d MMM', _dateLocale).format(r.reminderDate),
                   style: theme.textTheme.bodySmall),

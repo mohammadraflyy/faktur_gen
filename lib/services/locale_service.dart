@@ -84,7 +84,6 @@ const _strings = <String, List<String>>{
   'history.paid': ['Lunas', 'Paid'],
   'history.empty': ['Belum ada riwayat', 'No history yet'],
   'history.empty_sub': ['Dokumen yang dibuat akan muncul di sini', 'Created documents will appear here'],
-  'history.delete_title': ['Hapus Dokumen?', 'Delete Document?'],
   'history.export_csv': ['Export CSV', 'Export CSV'],
   'history.export_fail': ['Gagal export', 'Export failed'],
   'history.duplicate': ['Buat Ulang Dokumen', 'Duplicate Document'],
@@ -318,7 +317,6 @@ const _strings = <String, List<String>>{
 
   // ─── Update ──────────────────────────────────────────────────────────────
   'update.check': ['Periksa pembaruan', 'Check for updates'],
-  'update.check_sub': ['Unduh versi terbaru dari GitHub', 'Download the latest version from GitHub'],
   'update.checking': ['Memeriksa pembaruan rilis…', 'Checking for updates…'],
   'update.latest': ['Aplikasi Sudah Versi Terbaru', 'App Is Up to Date'],
   'update.latest_desc': ['Faktura Anda (v{version}) sudah merupakan versi paling mutakhir.', 'Your Faktura (v{version}) is the latest version.'],
@@ -338,8 +336,6 @@ const _strings = <String, List<String>>{
 
   // ─── Subscription ────────────────────────────────────────────────────────
   'sub.pro': ['Faktura Pro', 'Faktura Pro'],
-  'sub.free': ['Faktura Free', 'Faktura Free'],
-  'sub.upgrade': ['Upgrade', 'Upgrade'],
   'sub.unlock_all': ['Buka semua fitur premium', 'Unlock all premium features'],
   'sub.subscribe': ['Berlangganan', 'Subscribe'],
   'sub.restore': ['Pulihkan Pembelian', 'Restore Purchases'],
@@ -358,7 +354,6 @@ const _strings = <String, List<String>>{
   'sub.recurring': ['Invoice berulang', 'Recurring invoices'],
   'sub.multicurrency': ['Konversi mata uang', 'Currency conversion'],
   'sub.client_numbering': ['Penomoran per klien', 'Per-client numbering'],
-  'sub.docs_remaining': ['dokumen tersisa bulan ini', 'documents remaining this month'],
 
   // ─── Recurring ──────────────────────────────────────────────────────────
   'recurring.title': ['Invoice Berulang', 'Recurring Invoices'],
