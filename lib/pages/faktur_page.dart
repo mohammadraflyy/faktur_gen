@@ -313,7 +313,7 @@ class _FakturPageState extends State<FakturPage> {
       context,
       MaterialPageRoute(
         builder: (_) => PdfPreviewPage(
-          title: 'Preview Invoice',
+          title: tr('invoice.preview_title'),
           filename: 'Invoice_${faktur.nomorFaktur.replaceAll('/', '-')}.pdf',
           buildPdf: (format) => PdfService.buildBytes(faktur, format,
               logoBytes: _settings.logoBytes,
@@ -382,17 +382,17 @@ class _FakturPageState extends State<FakturPage> {
     final setReminder = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Atur Pengingat?'),
-        content: Text(
-            'Ingin mengatur pengingat layanan untuk ${faktur.namaPembeli}?'),
+        title: Text(tr('invoice.reminder_title')),
+        content: Text(tr('invoice.reminder_body')
+            .replaceAll('{name}', faktur.namaPembeli)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Tidak'),
+            child: Text(tr('invoice.reminder_no')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Ya, Atur'),
+            child: Text(tr('invoice.reminder_yes')),
           ),
         ],
       ),
@@ -435,7 +435,7 @@ class _FakturPageState extends State<FakturPage> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Pengingat berhasil disimpan'),
+          content: Text(tr('invoice.reminder_saved')),
           backgroundColor: AppColors.successFor(Theme.of(context).brightness),
         ),
       );
@@ -476,22 +476,22 @@ class _FakturPageState extends State<FakturPage> {
     final name = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Simpan Template'),
+        title: Text(tr('invoice.save_template')),
         content: TextField(
           controller: nameCtrl,
-          decoration: const InputDecoration(
-            labelText: 'Nama Template',
-            hintText: 'cth: Invoice Bulanan PT ABC',
+          decoration: InputDecoration(
+            labelText: tr('invoice.template_name'),
+            hintText: tr('invoice.template_name_hint'),
           ),
           autofocus: true,
         ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Batal')),
+              child: Text(tr('common.cancel'))),
           TextButton(
             onPressed: () => Navigator.pop(ctx, nameCtrl.text),
-            child: const Text('Simpan'),
+            child: Text(tr('common.save')),
           ),
         ],
       ),
@@ -521,7 +521,7 @@ class _FakturPageState extends State<FakturPage> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Template "$name" tersimpan'),
+          content: Text(tr('invoice.template_saved').replaceAll('{name}', name)),
           backgroundColor: AppColors.successFor(Theme.of(context).brightness),
         ),
       );
@@ -534,7 +534,7 @@ class _FakturPageState extends State<FakturPage> {
 
     if (templates.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Belum ada template tersimpan')),
+        SnackBar(content: Text(tr('invoice.no_templates'))),
       );
       return;
     }
@@ -601,16 +601,17 @@ class _FakturPageState extends State<FakturPage> {
         final leave = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Keluar?'),
-            content: const Text('Form belum disimpan. Yakin ingin keluar?'),
+            title: Text(tr('invoice.leave_title')),
+            content: Text(tr('invoice.leave_body')),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('Batal')),
+                  child: Text(tr('common.cancel'))),
               TextButton(
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Keluar',
-                    style: TextStyle(color: Colors.red)),
+                child: Text(tr('invoice.leave'),
+                    style: TextStyle(
+                        color: AppColors.errorFor(Theme.of(ctx).brightness))),
               ),
             ],
           ),
@@ -629,36 +630,39 @@ class _FakturPageState extends State<FakturPage> {
               if (val == 'catalog') _openCatalog();
             },
             itemBuilder: (_) => [
-              const PopupMenuItem(
+              PopupMenuItem(
                   value: 'catalog',
                   child: ListTile(
-                    leading: Icon(Icons.inventory_2_outlined, size: 20),
-                    title: Text('Katalog Item', style: TextStyle(fontSize: 14)),
+                    leading: const Icon(Icons.inventory_2_outlined, size: 20),
+                    title: Text(tr('invoice.catalog'),
+                        style: const TextStyle(fontSize: 14)),
                     dense: true,
                     contentPadding: EdgeInsets.zero,
                   )),
-              const PopupMenuItem(
+              PopupMenuItem(
                   value: 'load_template',
                   child: ListTile(
-                    leading: Icon(Icons.file_open_outlined, size: 20),
-                    title: Text('Load Template', style: TextStyle(fontSize: 14)),
+                    leading: const Icon(Icons.file_open_outlined, size: 20),
+                    title: Text(tr('invoice.load_template'),
+                        style: const TextStyle(fontSize: 14)),
                     dense: true,
                     contentPadding: EdgeInsets.zero,
                   )),
-              const PopupMenuItem(
+              PopupMenuItem(
                   value: 'save_template',
                   child: ListTile(
-                    leading: Icon(Icons.save_outlined, size: 20),
-                    title:
-                        Text('Simpan Template', style: TextStyle(fontSize: 14)),
+                    leading: const Icon(Icons.save_outlined, size: 20),
+                    title: Text(tr('invoice.save_template'),
+                        style: const TextStyle(fontSize: 14)),
                     dense: true,
                     contentPadding: EdgeInsets.zero,
                   )),
-              const PopupMenuItem(
+              PopupMenuItem(
                   value: 'reset',
                   child: ListTile(
-                    leading: Icon(Icons.refresh, size: 20),
-                    title: Text('Reset Form', style: TextStyle(fontSize: 14)),
+                    leading: const Icon(Icons.refresh, size: 20),
+                    title: Text(tr('invoice.reset_form'),
+                        style: const TextStyle(fontSize: 14)),
                     dense: true,
                     contentPadding: EdgeInsets.zero,
                   )),
@@ -1108,15 +1112,17 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Hapus Kontak?'),
-        content: Text('Hapus "${contact.nama}" dari daftar kontak?'),
+        title: Text(tr('invoice.delete_contact_title')),
+        content: Text(tr('invoice.delete_contact_body')
+            .replaceAll('{name}', contact.nama)),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Batal')),
+              child: Text(tr('common.cancel'))),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Hapus', style: TextStyle(color: Colors.red)),
+            child: Text(tr('common.delete'),
+                style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -1170,7 +1176,7 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
                             color: theme.colorScheme.primary, size: 22),
                         const SizedBox(width: 8),
                         Text(
-                          'Pilih Kontak',
+                          tr('invoice.pick_contact'),
                           style: GoogleFonts.inter(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
@@ -1179,7 +1185,8 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
                         ),
                         const Spacer(),
                         Text(
-                          '${widget.contacts.length} kontak',
+                          tr('invoice.contact_count')
+                              .replaceAll('{n}', '${widget.contacts.length}'),
                           style: GoogleFonts.inter(
                             fontSize: 12,
                             color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45),
@@ -1193,7 +1200,7 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
                       controller: _searchCtrl,
                       onChanged: _onSearch,
                       decoration: InputDecoration(
-                        hintText: 'Cari nama atau alamat...',
+                        hintText: tr('invoice.search_contact'),
                         hintStyle: GoogleFonts.inter(
                             fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45)),
                         prefixIcon: const Icon(Icons.search, size: 20),
@@ -1225,15 +1232,15 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
                             const SizedBox(height: 8),
                             Text(
                               widget.contacts.isEmpty
-                                  ? 'Belum ada kontak tersimpan'
-                                  : 'Tidak ditemukan',
+                                  ? tr('invoice.no_contacts')
+                                  : tr('contact.not_found'),
                               style: GoogleFonts.inter(
                                   fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35)),
                             ),
                             if (widget.contacts.isEmpty) ...[
                               const SizedBox(height: 4),
                               Text(
-                                'Kontak otomatis tersimpan saat buat invoice',
+                                tr('invoice.contacts_auto_hint'),
                                 style: GoogleFonts.inter(
                                     fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35)),
                               ),
@@ -1330,7 +1337,7 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
                 icon: Icon(Icons.delete_outline,
                     size: 18, color: theme.colorScheme.onSurface.withValues(alpha: 0.3)),
                 onPressed: () => _confirmDelete(contact),
-                tooltip: 'Hapus kontak',
+                tooltip: tr('invoice.delete_contact'),
               ),
             ],
           ),
@@ -1385,7 +1392,7 @@ class _TemplatePickerSheet extends StatelessWidget {
                             color: theme.colorScheme.primary, size: 22),
                         const SizedBox(width: 8),
                         Text(
-                          'Pilih Template',
+                          tr('invoice.pick_template'),
                           style: GoogleFonts.inter(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
@@ -1423,8 +1430,9 @@ class _TemplatePickerSheet extends StatelessWidget {
                               fontSize: 14, fontWeight: FontWeight.w600)),
                       subtitle: Text(
                         t.namaPembeli.isNotEmpty
-                            ? '${t.namaPembeli} - ${t.items.length} item'
-                            : '${t.items.length} item',
+                            ? '${t.namaPembeli} - ${tr('invoice.item_count').replaceAll('{n}', '${t.items.length}')}'
+                            : tr('invoice.item_count')
+                                .replaceAll('{n}', '${t.items.length}'),
                         style: GoogleFonts.inter(
                             fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
                       ),
@@ -1504,13 +1512,13 @@ class _CatalogPickerSheetState extends State<_CatalogPickerSheet> {
     final result = await showDialog<CatalogItem>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Tambah Item Katalog'),
+        title: Text(tr('invoice.add_catalog_item')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: namaCtrl,
-              decoration: const InputDecoration(labelText: 'Nama Item'),
+              decoration: InputDecoration(labelText: tr('invoice.item_name')),
               autofocus: true,
             ),
             const SizedBox(height: 8),
@@ -1519,14 +1527,14 @@ class _CatalogPickerSheetState extends State<_CatalogPickerSheet> {
                 Expanded(
                   child: TextField(
                     controller: satuanCtrl,
-                    decoration: const InputDecoration(labelText: 'Satuan'),
+                    decoration: InputDecoration(labelText: tr('item.unit')),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: TextField(
                     controller: hargaCtrl,
-                    decoration: const InputDecoration(labelText: 'Harga'),
+                    decoration: InputDecoration(labelText: tr('invoice.price')),
                     keyboardType: TextInputType.number,
                   ),
                 ),
@@ -1536,7 +1544,8 @@ class _CatalogPickerSheetState extends State<_CatalogPickerSheet> {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(tr('common.cancel'))),
           TextButton(
             onPressed: () {
               if (namaCtrl.text.trim().isEmpty) return;
@@ -1548,7 +1557,7 @@ class _CatalogPickerSheetState extends State<_CatalogPickerSheet> {
               );
               Navigator.pop(ctx, item);
             },
-            child: const Text('Simpan'),
+            child: Text(tr('common.save')),
           ),
         ],
       ),
@@ -1600,14 +1609,14 @@ class _CatalogPickerSheetState extends State<_CatalogPickerSheet> {
                         Icon(Icons.inventory_2_outlined,
                             color: theme.colorScheme.primary, size: 20),
                         const SizedBox(width: 8),
-                        Text('Katalog Item',
+                        Text(tr('invoice.catalog'),
                             style: GoogleFonts.inter(
                                 fontSize: 16, fontWeight: FontWeight.w600)),
                         const Spacer(),
                         TextButton.icon(
                           onPressed: _addNew,
                           icon: const Icon(Icons.add, size: 16),
-                          label: const Text('Baru'),
+                          label: Text(tr('invoice.catalog_new')),
                         ),
                       ],
                     ),
@@ -1615,9 +1624,9 @@ class _CatalogPickerSheetState extends State<_CatalogPickerSheet> {
                     TextField(
                       controller: _searchCtrl,
                       onChanged: _filter,
-                      decoration: const InputDecoration(
-                        hintText: 'Cari item...',
-                        prefixIcon: Icon(Icons.search, size: 18),
+                      decoration: InputDecoration(
+                        hintText: tr('invoice.search_item'),
+                        prefixIcon: const Icon(Icons.search, size: 18),
                       ),
                       style: GoogleFonts.inter(fontSize: 13),
                     ),
@@ -1631,8 +1640,8 @@ class _CatalogPickerSheetState extends State<_CatalogPickerSheet> {
                     ? Center(
                         child: Text(
                           widget.items.isEmpty
-                              ? 'Katalog kosong. Tap "Baru" untuk menambah.'
-                              : 'Tidak ditemukan',
+                              ? tr('invoice.catalog_empty')
+                              : tr('contact.not_found'),
                           style: GoogleFonts.inter(
                               fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
                         ),
