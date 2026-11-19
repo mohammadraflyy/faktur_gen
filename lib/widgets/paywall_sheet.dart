@@ -203,7 +203,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                 onPressed: _isLoading ? null : _purchase,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFFA000),
-                  foregroundColor: Colors.white,
+                  foregroundColor: const Color(0xFF111827),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
@@ -211,7 +211,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                 child: _isLoading
                     ? const SizedBox(width: 20, height: 20,
                         child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
+                          strokeWidth: 2))
                     : Text(
                         '${tr('sub.subscribe')} — ${BillingService.priceString}',
                         style: GoogleFonts.inter(

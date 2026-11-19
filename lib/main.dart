@@ -83,22 +83,23 @@ class AppColors {
 
   // Brand colors
   static const invoiceBlue = Color(0xFF2563EB);
-  static const strukGreen = Color(0xFF059669);
+  // #059669 was 3.77:1 under white text; #047857 is 5.48:1.
+  static const strukGreen = Color(0xFF047857);
 
   // Light variants (for dark mode)
   static const invoiceBlueSoft = Color(0xFF60A5FA);
   static const strukGreenSoft = Color(0xFF34D399);
 
-  // Status colors (light mode)
-  static const error = Color(0xFFDC2626);
-  static const warning = Color(0xFFD97706);
+  // Status colors (light mode), all >= 4.5:1 on white
+  static const error = Color(0xFFB91C1C);
+  static const warning = Color(0xFFB45309);
 
   // Status colors (dark mode — softer to avoid harsh contrast)
   static const errorSoft = Color(0xFFF87171);
   static const warningSoft = Color(0xFFFBBF24);
 
   // Success (for snackbar, badges)
-  static const success = Color(0xFF059669);
+  static const success = Color(0xFF047857);
   static const successSoft = Color(0xFF34D399);
 
   /// Get the appropriate error color for the current brightness.
@@ -138,8 +139,8 @@ class MyApp extends StatelessWidget {
           title: 'Faktura',
           debugShowCheckedModeBanner: false,
           themeMode: themeMode,
-          theme: _light(),
-          darkTheme: _dark(),
+          theme: light(),
+          darkTheme: dark(),
           home: const SplashWrapper(),
         ),
         );
@@ -147,7 +148,7 @@ class MyApp extends StatelessWidget {
     );
   }
 
-  static ThemeData _light() {
+  static ThemeData light() {
     final base = ThemeData.light(useMaterial3: true);
     final txt = GoogleFonts.interTextTheme(base.textTheme);
     return base.copyWith(
@@ -155,7 +156,8 @@ class MyApp extends StatelessWidget {
         seedColor: _primary,
         brightness: Brightness.light,
         primary: _primary,
-        secondary: const Color(0xFF059669),
+        onPrimary: Colors.white,
+        secondary: AppColors.strukGreen,
         surface: const Color(0xFFFAFBFC),
         onSurface: const Color(0xFF111827),
       ),
@@ -183,7 +185,7 @@ class MyApp extends StatelessWidget {
     );
   }
 
-  static ThemeData _dark() {
+  static ThemeData dark() {
     final base = ThemeData.dark(useMaterial3: true);
     final txt = GoogleFonts.interTextTheme(base.textTheme);
     return base.copyWith(
@@ -191,6 +193,8 @@ class MyApp extends StatelessWidget {
         seedColor: _primary,
         brightness: Brightness.dark,
         primary: const Color(0xFF60A5FA),
+        // White on #60A5FA is only 2.5:1.
+        onPrimary: const Color(0xFF0F1117),
         secondary: const Color(0xFF34D399),
         surface: const Color(0xFF161822),
         onSurface: const Color(0xFFE5E7EB),

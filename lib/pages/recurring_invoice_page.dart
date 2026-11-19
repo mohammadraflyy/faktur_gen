@@ -397,13 +397,13 @@ class _RecurringFormPageState extends State<_RecurringFormPage> {
                 onPressed: _isSaving ? null : _save,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: theme.colorScheme.primary,
-                  foregroundColor: Colors.white,
+                  foregroundColor: theme.colorScheme.onPrimary,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
                 ),
                 child: _isSaving
                     ? const SizedBox(width: 20, height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        child: CircularProgressIndicator(strokeWidth: 2))
                     : Text(isEdit ? tr('recurring.save_edit') : tr('recurring.save'),
                         style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600)),
               ),

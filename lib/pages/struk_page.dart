@@ -1097,7 +1097,7 @@ class _StrukPageState extends State<StrukPage> {
         onPressed: _isLoading ? null : _generatePdf,
         style: ElevatedButton.styleFrom(
           backgroundColor: theme.colorScheme.primary,
-          foregroundColor: Colors.white,
+          foregroundColor: theme.colorScheme.onPrimary,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),

@@ -724,12 +724,12 @@ mixin _SettingsSubPageMixin<T extends StatefulWidget> on State<T> {
         onPressed: isSaving ? null : onSave,
         style: ElevatedButton.styleFrom(
           backgroundColor: theme.colorScheme.primary,
-          foregroundColor: Colors.white,
+          foregroundColor: theme.colorScheme.onPrimary,
         ),
         child: isSaving
             ? const SizedBox(
                 width: 20, height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                child: CircularProgressIndicator(strokeWidth: 2))
             : Text(tr('common.save')),
       ),
     );

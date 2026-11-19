@@ -110,20 +110,21 @@ class _SignaturePadPageState extends State<SignaturePadPage> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: theme.colorScheme.primary,
-        foregroundColor: Colors.white,
+        foregroundColor: theme.colorScheme.onPrimary,
         title: const Text('Tanda Tangan'),
         actions: [
           TextButton(
             onPressed: _clear,
-            child: const Text('Hapus',
-                style: TextStyle(color: Colors.white70)),
+            child: Text('Hapus',
+                style: TextStyle(color: theme.colorScheme.onPrimary)),
           ),
           TextButton.icon(
             onPressed: _save,
-            icon: const Icon(Icons.check, color: Colors.white),
-            label: const Text('Simpan',
+            icon: Icon(Icons.check, color: theme.colorScheme.onPrimary),
+            label: Text('Simpan',
                 style: TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.w600)),
+                    color: theme.colorScheme.onPrimary,
+                    fontWeight: FontWeight.w600)),
           ),
         ],
       ),

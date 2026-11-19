@@ -184,7 +184,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                           : _next,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: theme.colorScheme.primary,
-                    foregroundColor: Colors.white,
+                    foregroundColor: theme.colorScheme.onPrimary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -194,7 +194,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
+                              strokeWidth: 2),
                         )
                       : Text(
                           _currentPage == 2 ? 'Mulai Sekarang' : 'Lanjut',
