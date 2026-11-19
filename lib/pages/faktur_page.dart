@@ -15,13 +15,13 @@ import '../services/locale_service.dart';
 import '../services/pdf_service.dart';
 import '../services/settings_service.dart';
 import '../services/subscription_service.dart';
-import '../services/reminder_service.dart';
 import '../services/template_service.dart';
 import '../models/reminder_model.dart';
 import '../widgets/catalog_picker_sheet.dart';
 import '../widgets/item_edit_sheet.dart';
 import '../widgets/paywall_sheet.dart';
 import '../widgets/total_bar.dart';
+import 'document_ready_page.dart';
 import 'pdf_preview_page.dart';
 
 class FakturPage extends StatefulWidget {
@@ -310,26 +310,60 @@ class _FakturPageState extends State<FakturPage> {
       if (mounted) setState(() => _isGenerating = false);
     }
     if (!saved || !mounted) return;
+    _openReady(isPro);
+  }
 
+  void _openReady(bool isPro) {
     final faktur = _faktur;
-    final done = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PdfPreviewPage(
-          title: tr('invoice.preview_title'),
-          filename: 'Invoice_${faktur.nomorFaktur.replaceAll('/', '-')}.pdf',
-          buildPdf: (format) => PdfService.buildBytes(faktur, format,
-              logoBytes: _settings.logoBytes,
-              signatureBytes: _settings.signatureBytes,
-              templateConfig: _settings.templateConfig,
-              showWatermark: !isPro,
-              qrisMerchantId: isPro ? _settings.qrisMerchantId : null),
-        ),
+    final settings = _settings;
+    final total = _currency.format(faktur.totalTagihan);
+    final now = DateTime.now();
+    final remindAt = defaultReminderDate(faktur.jatuhTempo, now);
+    final onDueDate = faktur.jatuhTempo != null &&
+        DateUtils.isSameDay(remindAt, faktur.jatuhTempo);
+    final ready = DocumentReadyPage(
+      title: tr('done.invoice_ready'),
+      summary: '${faktur.namaPembeli} · $total',
+      shareMessage: tr('done.invoice_message')
+          .replaceAll('{name}', faktur.namaPembeli)
+          .replaceAll('{number}', faktur.nomorFaktur)
+          .replaceAll('{amount}', total),
+      reminderLabel: tr(onDueDate ? 'done.remind_due' : 'done.remind_later'),
+      reminder: ReminderModel(
+        id: now.millisecondsSinceEpoch.toString(),
+        contactName: faktur.namaPembeli,
+        contactPhone: faktur.teleponPembeli,
+        contactAddress: faktur.alamatPembeli,
+        serviceName:
+            faktur.items.isNotEmpty ? faktur.items.first.namaBarang : '',
+        reminderDate: DateUtils.dateOnly(remindAt),
+        reminderHour: remindAt.hour,
+        reminderMinute: remindAt.minute,
+        docType: ReminderDocType.invoice,
+        lastItems: faktur.items
+            .map((i) => ReminderItem(
+                  nama: i.namaBarang,
+                  kuantitas: i.kuantitas,
+                  satuan: i.satuan,
+                  hargaSatuan: i.hargaSatuan,
+                ))
+            .toList(),
+      ),
+      preview: PdfPreviewPage(
+        title: tr('invoice.preview_title'),
+        filename: 'Invoice_${faktur.nomorFaktur.replaceAll('/', '-')}.pdf',
+        buildPdf: (format) => PdfService.buildBytes(faktur, format,
+            logoBytes: settings.logoBytes,
+            signatureBytes: settings.signatureBytes,
+            templateConfig: settings.templateConfig,
+            showWatermark: !isPro,
+            qrisMerchantId: isPro ? settings.qrisMerchantId : null),
       ),
     );
-    if (!mounted) return;
-    await _showReminderDialog(faktur);
-    if (done == true && mounted) Navigator.pop(context);
+    // The document is already saved, so the form is replaced: back and
+    // "Selesai" both return to wherever the form was opened from.
+    Navigator.pushReplacement(
+        context, MaterialPageRoute(builder: (_) => ready));
   }
 
   /// Checks the quota, then stores contact and history.
@@ -378,71 +412,6 @@ class _FakturPageState extends State<FakturPage> {
     await SubscriptionService.incrementDocCount();
     _isDirty = false;
     return true;
-  }
-
-  Future<void> _showReminderDialog(FakturModel faktur) async {
-    if (faktur.namaPembeli.trim().isEmpty) return;
-    final setReminder = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(tr('invoice.reminder_title')),
-        content: Text(tr('invoice.reminder_body')
-            .replaceAll('{name}', faktur.namaPembeli)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(tr('invoice.reminder_no')),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(tr('invoice.reminder_yes')),
-          ),
-        ],
-      ),
-    );
-    if (setReminder != true || !mounted) return;
-
-    final date = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now().add(const Duration(days: 30)),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365 * 3)),
-    );
-    if (date == null || !mounted) return;
-
-    final time = await showTimePicker(
-      context: context,
-      initialTime: const TimeOfDay(hour: 8, minute: 0),
-    );
-    if (time == null) return;
-
-    await ReminderService.add(ReminderModel(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      contactName: faktur.namaPembeli,
-      contactPhone: faktur.teleponPembeli,
-      contactAddress: faktur.alamatPembeli,
-      serviceName: faktur.items.isNotEmpty ? faktur.items.first.namaBarang : '',
-      reminderDate: date,
-      reminderHour: time.hour,
-      reminderMinute: time.minute,
-      docType: ReminderDocType.invoice,
-      lastItems: faktur.items
-          .map((i) => ReminderItem(
-                nama: i.namaBarang,
-                kuantitas: i.kuantitas,
-                satuan: i.satuan,
-                hargaSatuan: i.hargaSatuan,
-              ))
-          .toList(),
-    ));
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(tr('invoice.reminder_saved')),
-          backgroundColor: AppColors.successFor(Theme.of(context).brightness),
-        ),
-      );
-    }
   }
 
   Future<void> _openCatalog() async {
