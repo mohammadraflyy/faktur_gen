@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../services/billing_service.dart';
 import '../services/locale_service.dart';
 import '../services/subscription_service.dart';
@@ -51,7 +50,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
     }
   }
 
-  void _showRedeemDialog(BuildContext context) {
+  void _showRedeemDialog() {
     final codeCtrl = TextEditingController();
     showDialog(
       context: context,
@@ -136,7 +135,6 @@ class _PaywallSheetState extends State<_PaywallSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     return SafeArea(
       child: Padding(
@@ -157,27 +155,21 @@ class _PaywallSheetState extends State<_PaywallSheet> {
             Container(
               width: 64, height: 64,
               decoration: BoxDecoration(
-                color: const Color(0xFFFFC107).withValues(alpha: 0.15),
+                color: theme.colorScheme.primary.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.workspace_premium_rounded,
-                  size: 32, color: Color(0xFFFFA000)),
+              child: Icon(Icons.workspace_premium_rounded,
+                  size: 32, color: theme.colorScheme.primary),
             ),
             const SizedBox(height: 16),
             Text(
               tr('sub.pro'),
-              style: GoogleFonts.inter(
-                fontSize: 22, fontWeight: FontWeight.w700,
-                color: theme.colorScheme.onSurface,
-              ),
+              style: theme.textTheme.headlineSmall,
             ),
             const SizedBox(height: 6),
             Text(
               tr('sub.unlock_all'),
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-              ),
+              style: theme.textTheme.bodySmall,
             ),
             const SizedBox(height: 24),
             // Features list
@@ -185,13 +177,10 @@ class _PaywallSheetState extends State<_PaywallSheet> {
               padding: const EdgeInsets.only(bottom: 12),
               child: Row(
                 children: [
-                  Icon(f.$1, size: 20, color: const Color(0xFFFFA000)),
+                  Icon(f.$1, size: 20,
+                      color: theme.colorScheme.onSurfaceVariant),
                   const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(tr(f.$2),
-                      style: GoogleFonts.inter(fontSize: 14,
-                        color: theme.colorScheme.onSurface)),
-                  ),
+                  Expanded(child: Text(tr(f.$2))),
                 ],
               ),
             )),
@@ -203,58 +192,33 @@ class _PaywallSheetState extends State<_PaywallSheet> {
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _purchase,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFFA000),
-                  foregroundColor: const Color(0xFF111827),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
                 ),
                 child: _isLoading
                     ? const SizedBox(width: 20, height: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2))
                     : Text(
-                        '${tr('sub.subscribe')} — ${BillingService.priceString}',
-                        style: GoogleFonts.inter(
-                          fontSize: 15, fontWeight: FontWeight.w600),
-                      ),
+                        '${tr('sub.subscribe')} — ${BillingService.priceString}'),
               ),
             ),
             const SizedBox(height: 12),
             TextButton(
               onPressed: _isLoading ? null : _restore,
-              child: Text(
-                tr('sub.restore'),
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  color: isDark ? Colors.grey[400] : Colors.grey[600],
-                ),
-              ),
+              child: Text(tr('sub.restore')),
             ),
             const SizedBox(height: 4),
             TextButton.icon(
-              onPressed: _isLoading ? null : () => _showRedeemDialog(context),
-              icon: Icon(Icons.card_giftcard_rounded, size: 16,
-                color: isDark ? Colors.grey[400] : Colors.grey[600]),
-              label: Text(
-                tr('sub.redeem'),
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  color: isDark ? Colors.grey[400] : Colors.grey[600],
-                ),
-              ),
+              onPressed: _isLoading ? null : _showRedeemDialog,
+              icon: const Icon(Icons.card_giftcard_rounded, size: 16),
+              label: Text(tr('sub.redeem')),
             ),
             // Free Pro for testing; must never reach a release build.
             if (kDebugMode)
               TextButton(
                 onPressed: _isLoading ? null : _debugActivate,
-                child: Text(
-                  'Activate Pro (Debug)',
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    color: isDark ? Colors.grey[600] : Colors.grey[400],
-                  ),
-                ),
+                child: const Text('Activate Pro (Debug)'),
               ),
           ],
         ),
