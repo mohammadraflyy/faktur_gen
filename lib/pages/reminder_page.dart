@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -8,6 +9,7 @@ import '../models/reminder_model.dart';
 import '../services/contact_service.dart';
 import '../services/locale_service.dart';
 import '../services/reminder_service.dart';
+import '../widgets/status_label.dart';
 import 'faktur_page.dart';
 import 'struk_page.dart';
 
@@ -22,9 +24,12 @@ class _ReminderPageState extends State<ReminderPage>
     with SingleTickerProviderStateMixin {
   List<ReminderModel> _reminders = [];
   bool _isLoading = true;
+  bool _showLoadingText = false;
+  Timer? _loadingTimer;
   late TabController _tabCtrl;
 
-  final _dateFormat = DateFormat('dd MMM yyyy', 'id_ID');
+  DateFormat get _dateFormat =>
+      DateFormat('dd MMM yyyy', LocaleService.isEn ? 'en_US' : 'id_ID');
 
   @override
   void initState() {
@@ -35,17 +40,25 @@ class _ReminderPageState extends State<ReminderPage>
 
   @override
   void dispose() {
+    _loadingTimer?.cancel();
     _tabCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
+    _loadingTimer?.cancel();
+    // A fast load should not flash a loading message.
+    _loadingTimer = Timer(const Duration(milliseconds: 300), () {
+      if (mounted && _isLoading) setState(() => _showLoadingText = true);
+    });
     try {
       final list = await ReminderService.loadAll();
       if (mounted) setState(() { _reminders = list; _isLoading = false; });
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
       debugPrint('[Reminder] load error: $e');
+    } finally {
+      _loadingTimer?.cancel();
     }
   }
 
@@ -80,7 +93,9 @@ class _ReminderPageState extends State<ReminderPage>
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${r.serviceName} untuk ${r.contactName} ${tr('reminder.marked_done')}'),
+          content: Text(tr('reminder.marked_done_msg')
+              .replaceAll('{service}', r.serviceName)
+              .replaceAll('{name}', r.contactName)),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -162,11 +177,15 @@ class _ReminderPageState extends State<ReminderPage>
     }
     phone = phone.replaceAll('+', '');
 
-    final message = 'Halo ${r.contactName}, ini pengingat untuk layanan '
-        '*${r.serviceName}* yang dijadwalkan tanggal '
-        '${_dateFormat.format(r.reminderDate)}.'
-        '${r.notes.isNotEmpty ? '\n\nCatatan: ${r.notes}' : ''}'
-        '\n\nTerima kasih 🙏';
+    final notes = r.notes.isEmpty
+        ? ''
+        : tr('reminder.wa_notes').replaceAll('{notes}', r.notes);
+    // {notes} last, so placeholders typed inside the notes stay literal.
+    final message = tr('reminder.wa_message')
+        .replaceAll('{name}', r.contactName)
+        .replaceAll('{service}', r.serviceName)
+        .replaceAll('{date}', _dateFormat.format(r.reminderDate))
+        .replaceAll('{notes}', notes);
 
     final uri = Uri.parse(
         'https://wa.me/$phone?text=${Uri.encodeComponent(message)}');
@@ -179,44 +198,32 @@ class _ReminderPageState extends State<ReminderPage>
     }
   }
 
+  String _when(ReminderModel r) =>
+      '${_dateFormat.format(r.reminderDate)}, '
+      '${r.reminderHour.toString().padLeft(2, '0')}:'
+      '${r.reminderMinute.toString().padLeft(2, '0')}';
+
+  String _repeatLabel(ReminderModel r) =>
+      tr('reminder.repeat_${r.repeatInterval.name}');
+
   void _showDetail(ReminderModel r) {
     final theme = Theme.of(context);
-    final isOverdue = r.isOverdue;
-    final isDue = r.isDue && !isOverdue;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      showDragHandle: true,
       builder: (_) {
         return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          // Scrolls instead of overflowing at large text sizes.
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  tr('reminder.detail_title'),
-                  style: GoogleFonts.inter(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
+                Text(tr('reminder.detail_title'),
+                    style: theme.textTheme.titleMedium),
                 const SizedBox(height: 16),
                 _detailRow(theme, Icons.person_outlined, tr('reminder.customer'), r.contactName),
                 if (r.contactPhone.isNotEmpty)
@@ -224,38 +231,30 @@ class _ReminderPageState extends State<ReminderPage>
                 if (r.contactAddress.isNotEmpty)
                   _detailRow(theme, Icons.location_on_outlined, tr('common.address'), r.contactAddress),
                 _detailRow(theme, Icons.build_outlined, tr('reminder.service'), r.serviceName),
-                _detailRow(
-                  theme,
-                  Icons.calendar_today,
-                  tr('reminder.date'),
-                  '${_dateFormat.format(r.reminderDate)}, '
-                      '${r.reminderHour.toString().padLeft(2, '0')}:'
-                      '${r.reminderMinute.toString().padLeft(2, '0')}',
-                ),
+                _detailRow(theme, Icons.calendar_today, tr('reminder.date'), _when(r)),
                 if (r.isRepeating)
-                  _detailRow(theme, Icons.repeat, tr('reminder.repeat'), r.repeatInterval.label),
+                  _detailRow(theme, Icons.repeat, tr('reminder.repeat'), _repeatLabel(r)),
                 if (r.notes.isNotEmpty)
                   _detailRow(theme, Icons.notes_outlined, tr('reminder.notes'), r.notes),
                 _detailRow(
                   theme,
                   Icons.info_outline,
                   tr('reminder.status'),
-                  isOverdue
+                  r.isOverdue
                       ? tr('reminder.overdue')
-                      : isDue
+                      : r.isDue
                           ? tr('reminder.due_today')
                           : r.status == ReminderStatus.pending
                               ? tr('reminder.waiting')
                               : tr('reminder.done'),
                 ),
-                const SizedBox(height: 16),
-                // Actions
+                const SizedBox(height: 4),
+                const Divider(height: 1),
                 if (r.contactPhone.isNotEmpty)
                   _actionTile(
                     theme,
-                    icon: Icons.message_rounded,
+                    icon: Icons.message_outlined,
                     label: tr('reminder.send_wa'),
-                    color: const Color(0xFF25D366),
                     onTap: () {
                       Navigator.pop(context);
                       _sendWhatsApp(r);
@@ -270,9 +269,6 @@ class _ReminderPageState extends State<ReminderPage>
                     label: r.docType == ReminderDocType.struk
                         ? tr('reminder.create_receipt')
                         : tr('reminder.create_invoice'),
-                    color: r.docType == ReminderDocType.struk
-                        ? const Color(0xFF059669)
-                        : const Color(0xFF2563EB),
                     onTap: () {
                       Navigator.pop(context);
                       _createDocFromReminder(r);
@@ -300,7 +296,7 @@ class _ReminderPageState extends State<ReminderPage>
                   const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,
-                    height: 46,
+                    height: 48,
                     child: FilledButton.icon(
                       onPressed: () {
                         Navigator.pop(context);
@@ -310,12 +306,13 @@ class _ReminderPageState extends State<ReminderPage>
                       label: Text(tr('reminder.mark_done')),
                     ),
                   ),
+                  const SizedBox(height: 8),
                 ],
                 _actionTile(
                   theme,
                   icon: Icons.delete_outline,
                   label: tr('common.delete'),
-                  color: Colors.red,
+                  color: AppColors.errorFor(theme.brightness),
                   onTap: () {
                     Navigator.pop(context);
                     _confirmDelete(r);
@@ -330,31 +327,23 @@ class _ReminderPageState extends State<ReminderPage>
   }
 
   Widget _detailRow(ThemeData theme, IconData icon, String label, String value) {
+    final muted = theme.textTheme.bodySmall;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 16, color: theme.colorScheme.onSurface.withValues(alpha: 0.4)),
-          const SizedBox(width: 10),
-          SizedBox(
-            width: 72,
-            child: Text(
-              label,
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-              ),
-            ),
-          ),
+          Icon(icon, size: 18, color: muted?.color),
+          const SizedBox(width: 12),
+          // Label above the value, so long labels survive 200% text.
           Expanded(
-            child: Text(
-              value,
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: theme.colorScheme.onSurface,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: muted),
+                const SizedBox(height: 2),
+                Text(value, style: theme.textTheme.bodyMedium),
+              ],
             ),
           ),
         ],
@@ -372,20 +361,15 @@ class _ReminderPageState extends State<ReminderPage>
     final c = color ?? theme.colorScheme.onSurface;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 14),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: c.withValues(alpha: 0.7)),
-            const SizedBox(width: 12),
-            Text(
-              label,
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: c,
-              ),
+            Icon(icon, size: 20, color: c),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(label,
+                  style: theme.textTheme.bodyLarge?.copyWith(color: c)),
             ),
           ],
         ),
@@ -410,10 +394,16 @@ class _ReminderPageState extends State<ReminderPage>
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _addReminder,
+        tooltip: tr('reminder.add_title'),
         child: const Icon(Icons.add),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+              child: _showLoadingText
+                  ? Text(tr('dashboard.loading'),
+                      style: theme.textTheme.bodySmall)
+                  : const SizedBox.shrink(),
+            )
           : TabBarView(
               controller: _tabCtrl,
               children: [
@@ -430,42 +420,21 @@ class _ReminderPageState extends State<ReminderPage>
       return RefreshIndicator(
         onRefresh: _load,
         child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 48, 20, 32),
           children: [
-            SizedBox(
-              height: MediaQuery.sizeOf(context).height * 0.5,
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isPending ? Icons.notifications_none : Icons.check_circle_outline,
-                      size: 48,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      isPending
-                          ? tr('reminder.empty_pending')
-                          : tr('reminder.empty_done'),
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-                      ),
-                    ),
-                    if (isPending) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        tr('reminder.add_hint'),
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
+            Text(
+              isPending
+                  ? tr('reminder.empty_pending')
+                  : tr('reminder.empty_done'),
+              style: theme.textTheme.bodyLarge,
+              textAlign: TextAlign.center,
             ),
+            if (isPending) ...[
+              const SizedBox(height: 4),
+              Text(tr('reminder.add_hint'),
+                  style: theme.textTheme.bodySmall,
+                  textAlign: TextAlign.center),
+            ],
           ],
         ),
       );
@@ -473,157 +442,68 @@ class _ReminderPageState extends State<ReminderPage>
 
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView.builder(
-        padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.of(context).padding.bottom + 80),
+      child: ListView.separated(
+        // Bottom room so the FAB never covers the last row.
+        padding: EdgeInsets.fromLTRB(
+            20, 8, 20, MediaQuery.paddingOf(context).bottom + 80),
         itemCount: list.length,
-        itemBuilder: (_, i) => _buildCard(theme, list[i], isPending: isPending),
+        separatorBuilder: (_, _) => const Divider(height: 1),
+        itemBuilder: (_, i) => _buildRow(theme, list[i], isPending: isPending),
       ),
     );
   }
 
-  Widget _buildCard(ThemeData theme, ReminderModel r,
+  Widget _buildRow(ThemeData theme, ReminderModel r,
       {required bool isPending}) {
-    final isOverdue = r.isOverdue;
-    final isDue = r.isDue && !isOverdue;
+    final error = AppColors.errorFor(theme.brightness);
+    final repeat = r.isRepeating ? ' · ${_repeatLabel(r)}' : '';
 
-    final errColor = AppColors.errorFor(theme.brightness);
-    final warnColor = AppColors.warningFor(theme.brightness);
-
-    Color accentColor;
-    if (isOverdue) {
-      accentColor = errColor;
-    } else if (isDue) {
-      accentColor = warnColor;
-    } else {
-      accentColor = theme.colorScheme.primary;
-    }
-
-    final card = GestureDetector(
+    final row = InkWell(
       onTap: () => _showDetail(r),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: theme.cardColor,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: (isOverdue || isDue)
-                ? accentColor.withValues(alpha: 0.4)
-                : theme.dividerTheme.color ?? Colors.grey.shade200,
-          ),
-        ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Left accent icon
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: accentColor.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                Icons.notifications_active_outlined,
-                size: 20,
-                color: accentColor,
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Content
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          r.contactName,
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: theme.colorScheme.onSurface,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (isOverdue || isDue)
-                        Container(
-                          margin: const EdgeInsets.only(left: 8),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: accentColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            isOverdue ? tr('reminder.overdue') : tr('dashboard.today'),
-                            style: GoogleFonts.inter(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: accentColor,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    r.serviceName,
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      color: theme.colorScheme.onSurface
-                          .withValues(alpha: 0.55),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.calendar_today,
-                          size: 11,
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.35)),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${_dateFormat.format(r.reminderDate)}, ${r.reminderHour.toString().padLeft(2, '0')}:${r.reminderMinute.toString().padLeft(2, '0')}',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.4),
-                        ),
-                      ),
-                      if (r.isRepeating) ...[
-                        const SizedBox(width: 8),
-                        Icon(Icons.repeat,
-                            size: 11,
-                            color: theme.colorScheme.primary
-                                .withValues(alpha: 0.5)),
-                        const SizedBox(width: 3),
-                        Text(
-                          r.repeatInterval.label,
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            color: theme.colorScheme.primary
-                                .withValues(alpha: 0.6),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+                  Text(r.contactName,
+                      style: theme.textTheme.titleSmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                  if (r.serviceName.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(r.serviceName,
+                        style: theme.textTheme.bodySmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                  ],
+                  const SizedBox(height: 2),
+                  Text('${_when(r)}$repeat', style: theme.textTheme.bodySmall),
                 ],
               ),
             ),
-            // Chevron hint
-            Icon(Icons.chevron_right_rounded,
-                size: 18,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.2)),
+            if (r.isOverdue) ...[
+              const SizedBox(width: 12),
+              StatusLabel(text: tr('reminder.overdue'), color: error),
+            ] else if (r.isDue) ...[
+              const SizedBox(width: 12),
+              StatusLabel(
+                  text: tr('dashboard.today'),
+                  color: AppColors.warningFor(theme.brightness)),
+            ],
           ],
         ),
       ),
     );
+
+    final deleteBg = _swipeBackground(theme,
+        alignment: Alignment.centerRight,
+        color: error,
+        icon: Icons.delete_outline,
+        label: tr('common.delete'));
 
     if (!isPending) {
       // Completed: swipe left to delete only
@@ -631,12 +511,8 @@ class _ReminderPageState extends State<ReminderPage>
         key: ValueKey(r.id),
         direction: DismissDirection.endToStart,
         confirmDismiss: (_) => _confirmDelete(r),
-        background: _swipeBackground(
-          alignment: Alignment.centerRight,
-          color: errColor,
-          icon: Icons.delete_outline,
-        ),
-        child: card,
+        background: deleteBg,
+        child: row,
       );
     }
 
@@ -651,17 +527,13 @@ class _ReminderPageState extends State<ReminderPage>
           return _confirmDelete(r);
         }
       },
-      background: _swipeBackground(
-        alignment: Alignment.centerLeft,
-        color: AppColors.successFor(theme.brightness),
-        icon: Icons.check_rounded,
-      ),
-      secondaryBackground: _swipeBackground(
-        alignment: Alignment.centerRight,
-        color: errColor,
-        icon: Icons.delete_outline,
-      ),
-      child: card,
+      background: _swipeBackground(theme,
+          alignment: Alignment.centerLeft,
+          color: AppColors.successFor(theme.brightness),
+          icon: Icons.check_rounded,
+          label: tr('reminder.mark_done')),
+      secondaryBackground: deleteBg,
+      child: row,
     );
   }
 
@@ -670,8 +542,9 @@ class _ReminderPageState extends State<ReminderPage>
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(tr('reminder.delete_title')),
-        content:
-            Text('${tr('common.delete')} "${r.serviceName}" untuk ${r.contactName}?'),
+        content: Text(tr('reminder.delete_body')
+            .replaceAll('{service}', r.serviceName)
+            .replaceAll('{name}', r.contactName)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -679,7 +552,9 @@ class _ReminderPageState extends State<ReminderPage>
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(tr('common.delete'), style: const TextStyle(color: Colors.red)),
+            child: Text(tr('common.delete'),
+                style: TextStyle(
+                    color: AppColors.errorFor(Theme.of(ctx).brightness))),
           ),
         ],
       ),
@@ -692,20 +567,23 @@ class _ReminderPageState extends State<ReminderPage>
     return false;
   }
 
-  Widget _swipeBackground({
+  Widget _swipeBackground(
+    ThemeData theme, {
     required Alignment alignment,
     required Color color,
     required IconData icon,
+    required String label,
   }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-      ),
+      color: color,
       alignment: alignment,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Icon(icon, color: color, size: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Icon(icon,
+          // White on the light colors, #0F1117 on the dark-mode ones; all >= 5.48:1.
+          color: theme.brightness == Brightness.dark
+              ? const Color(0xFF0F1117)
+              : Colors.white,
+          semanticLabel: label),
     );
   }
 }
