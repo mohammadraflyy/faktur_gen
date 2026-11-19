@@ -300,16 +300,17 @@ class _FakturPageState extends State<FakturPage> {
 
     setState(() => _isGenerating = true);
     final bool saved;
+    var isPro = false;
     try {
       saved = await _saveDocument();
+      // Stay busy until the preview opens, so a second tap cannot save twice.
+      if (saved) isPro = await SubscriptionService.isPro();
     } finally {
       if (mounted) setState(() => _isGenerating = false);
     }
     if (!saved || !mounted) return;
 
     final faktur = _faktur;
-    final isPro = await SubscriptionService.isPro();
-    if (!mounted) return;
     final done = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
@@ -1199,8 +1200,7 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
                         ),
                         const Spacer(),
                         Text(
-                          tr('invoice.contact_count')
-                              .replaceAll('{n}', '${widget.contacts.length}'),
+                          trN('invoice.contact_count', widget.contacts.length),
                           style: GoogleFonts.inter(
                             fontSize: 12,
                             color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45),
@@ -1444,9 +1444,8 @@ class _TemplatePickerSheet extends StatelessWidget {
                               fontSize: 14, fontWeight: FontWeight.w600)),
                       subtitle: Text(
                         t.namaPembeli.isNotEmpty
-                            ? '${t.namaPembeli} - ${tr('invoice.item_count').replaceAll('{n}', '${t.items.length}')}'
-                            : tr('invoice.item_count')
-                                .replaceAll('{n}', '${t.items.length}'),
+                            ? '${t.namaPembeli} - ${trN('invoice.item_count', t.items.length)}'
+                            : trN('invoice.item_count', t.items.length),
                         style: GoogleFonts.inter(
                             fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
                       ),

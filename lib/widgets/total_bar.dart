@@ -51,10 +51,15 @@ class TotalBar extends StatelessWidget {
                           alignment: Alignment.centerLeft,
                           children: [...previous, ?current],
                         ),
-                        child: Text(
-                          currency.format(value),
+                        // Shrink instead of wrapping at large text sizes.
+                        child: FittedBox(
                           key: ValueKey(value),
-                          style: theme.textTheme.headlineSmall,
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            currency.format(value),
+                            style: theme.textTheme.headlineSmall,
+                          ),
                         ),
                       ),
                     ),

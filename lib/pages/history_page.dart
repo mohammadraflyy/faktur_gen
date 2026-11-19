@@ -18,7 +18,9 @@ import '../pages/struk_page.dart';
 import '../services/locale_service.dart';
 
 class HistoryPage extends StatefulWidget {
-  const HistoryPage({super.key});
+  final bool unpaidOnly;
+
+  const HistoryPage({super.key, this.unpaidOnly = false});
 
   @override
   State<HistoryPage> createState() => _HistoryPageState();
@@ -44,6 +46,7 @@ class _HistoryPageState extends State<HistoryPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.unpaidOnly) _paymentFilter = PaymentStatus.unpaid;
     _load();
   }
 

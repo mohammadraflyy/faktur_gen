@@ -72,7 +72,12 @@ class _DashboardPageState extends State<DashboardPage> {
       });
     } catch (e) {
       debugPrint('[Dashboard] load failed: $e');
-      if (mounted) {
+      if (!mounted) return;
+      if (!_isLoading) {
+        // Failed pull-to-refresh: keep the numbers already on screen.
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(tr('dashboard.load_failed'))));
+      } else {
         setState(() {
           _isLoading = false;
           _failed = true;
@@ -191,21 +196,23 @@ class _DashboardPageState extends State<DashboardPage> {
       children: [
         Text(tr('dashboard.unpaid_heading'), style: theme.textTheme.bodySmall),
         const SizedBox(height: 8),
-        Text(_currency.format(s.unpaidTotal),
-            style: theme.textTheme.displaySmall),
+        // Shrink instead of wrapping a big amount at large text sizes.
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(_currency.format(s.unpaidTotal),
+              style: theme.textTheme.displaySmall),
+        ),
         const SizedBox(height: 6),
         Wrap(
           spacing: 8,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Text(
-                tr('dashboard.invoice_count')
-                    .replaceAll('{n}', '${s.unpaidCount}'),
+            Text(trN('dashboard.invoice_count', s.unpaidCount),
                 style: theme.textTheme.bodySmall),
             if (s.overdue.isNotEmpty)
               StatusLabel(
-                text: tr('dashboard.overdue_count')
-                    .replaceAll('{n}', '${s.overdue.length}'),
+                text: trN('dashboard.overdue_count', s.overdue.length),
                 color: error,
               ),
           ],
@@ -222,9 +229,9 @@ class _DashboardPageState extends State<DashboardPage> {
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton(
-              onPressed: () => MainNavigation.goToTab(context, 1),
-              child: Text(tr('dashboard.see_all')
-                  .replaceAll('{n}', '${s.unpaidCount}')),
+              onPressed: () =>
+                  MainNavigation.goToTab(context, 1, unpaidOnly: true),
+              child: Text(trN('dashboard.see_all', s.unpaidCount)),
             ),
           ),
       ],
@@ -234,7 +241,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _overdueRow(
       ThemeData theme, HistoryEntry e, DateTime now, Color error) {
     return InkWell(
-      onTap: () => MainNavigation.goToTab(context, 1),
+      onTap: () => MainNavigation.goToTab(context, 1, unpaidOnly: true),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 14),
         child: Row(
@@ -255,8 +262,8 @@ class _DashboardPageState extends State<DashboardPage> {
                     children: [
                       Text(e.nomorDokumen, style: theme.textTheme.bodySmall),
                       StatusLabel(
-                        text: tr('dashboard.days_late').replaceAll('{n}',
-                            '${DashboardSummary.daysOverdue(e, now)}'),
+                        text: trN('dashboard.days_late',
+                            DashboardSummary.daysOverdue(e, now)),
                         color: error,
                       ),
                     ],

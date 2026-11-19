@@ -33,6 +33,11 @@ class LocaleService {
 /// Translate a key. Returns English or Indonesian based on current locale.
 String tr(String key) => _strings[key]?[LocaleService.isEn ? 1 : 0] ?? key;
 
+/// Like [tr] with `{n}` filled; uses the `<key>_one` variant when n == 1.
+String trN(String key, int n) =>
+    tr(n == 1 && _strings.containsKey('${key}_one') ? '${key}_one' : key)
+        .replaceAll('{n}', '$n');
+
 /// [Indonesian, English] pairs
 const _strings = <String, List<String>>{
   // ─── Navigation ──────────────────────────────────────────────────────────
@@ -369,8 +374,10 @@ const _strings = <String, List<String>>{
   'common.import_fail': ['Gagal import', 'Import failed'],
   'dashboard.unpaid_heading': ['Belum dibayar', 'Unpaid'],
   'dashboard.invoice_count': ['{n} invoice', '{n} invoices'],
+  'dashboard.invoice_count_one': ['{n} invoice', '{n} invoice'],
   'dashboard.overdue_count': ['{n} lewat jatuh tempo', '{n} overdue'],
   'dashboard.days_late': ['lewat {n} hari', '{n} days overdue'],
+  'dashboard.days_late_one': ['lewat {n} hari', '{n} day overdue'],
   'dashboard.see_all': ['Lihat semua ({n})', 'See all ({n})'],
   'dashboard.income': ['masuk', 'received'],
   'dashboard.six_months': ['6 bulan', '6 months'],
@@ -444,11 +451,13 @@ const _strings = <String, List<String>>{
   'invoice.delete_contact': ['Hapus kontak', 'Delete contact'],
   'invoice.pick_contact': ['Pilih Kontak', 'Choose contact'],
   'invoice.contact_count': ['{n} kontak', '{n} contacts'],
+  'invoice.contact_count_one': ['{n} kontak', '{n} contact'],
   'invoice.search_contact': ['Cari nama atau alamat...', 'Search name or address...'],
   'invoice.no_contacts': ['Belum ada kontak tersimpan', 'No saved contacts yet'],
   'invoice.contacts_auto_hint': ['Kontak otomatis tersimpan saat buat invoice', 'Contacts are saved when you create an invoice'],
   'invoice.pick_template': ['Pilih Template', 'Choose template'],
   'invoice.item_count': ['{n} item', '{n} items'],
+  'invoice.item_count_one': ['{n} item', '{n} item'],
   'invoice.add_catalog_item': ['Tambah Item Katalog', 'Add catalog item'],
   'invoice.item_name': ['Nama Item', 'Item name'],
   'invoice.price': ['Harga', 'Price'],

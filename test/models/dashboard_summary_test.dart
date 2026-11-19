@@ -43,6 +43,7 @@ void main() {
       _e(amount: 3, due: DateTime(2026, 11, 19)),
       _e(amount: 4),
       _e(amount: 5, status: PaymentStatus.paid, due: DateTime(2026, 11, 1)),
+      _e(amount: 6, type: DocType.struk, due: DateTime(2026, 11, 1)),
     ], now);
     expect(s.overdue.map((e) => e.totalAmount), [2, 1]);
   });

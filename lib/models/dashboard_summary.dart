@@ -59,6 +59,7 @@ class DashboardSummary {
   MonthTotal get thisMonth => months.last;
   MonthTotal get lastMonth => months[months.length - 2];
 
+  // Only for entries with a due date, e.g. those in [overdue].
   // UTC dates so a DST shift can never turn 24h into 23h.
   static int daysOverdue(HistoryEntry e, DateTime now) {
     final due = e.jatuhTempo!;

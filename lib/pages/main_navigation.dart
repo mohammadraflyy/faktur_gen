@@ -16,9 +16,11 @@ class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
 
   /// Switch tab from a page inside MainNavigation (e.g. dashboard banner).
-  static void goToTab(BuildContext context, int index) => context
-      .findAncestorStateOfType<_MainNavigationState>()
-      ?._onNavTap(index);
+  static void goToTab(BuildContext context, int index,
+          {bool unpaidOnly = false}) =>
+      context
+          .findAncestorStateOfType<_MainNavigationState>()
+          ?._onNavTap(index, unpaidOnly: unpaidOnly);
 
   @override
   State<MainNavigation> createState() => _MainNavigationState();
@@ -32,6 +34,8 @@ class _MainNavigationState extends State<MainNavigation> {
   Timer? _updateCheckTimer;
   // Bumped after a create flow closes so the tab remounts and reloads.
   int _pageGeneration = 0;
+  // Riwayat opened from the Beranda unpaid list starts filtered.
+  bool _historyUnpaidOnly = false;
 
   static const _pages = [
     DashboardPage(),
@@ -115,9 +119,12 @@ class _MainNavigationState extends State<MainNavigation> {
     }
   }
 
-  void _onNavTap(int index) {
+  void _onNavTap(int index, {bool unpaidOnly = false}) {
     if (index == _currentIndex) return;
-    setState(() => _currentIndex = index);
+    setState(() {
+      _currentIndex = index;
+      _historyUnpaidOnly = unpaidOnly;
+    });
     if (index == 0 || index == 2) _loadDueCount();
   }
 
@@ -219,7 +226,9 @@ class _MainNavigationState extends State<MainNavigation> {
       ),
       child: KeyedSubtree(
         key: ValueKey('$_currentIndex-$_pageGeneration'),
-        child: _pages[_currentIndex],
+        child: _currentIndex == 1
+            ? HistoryPage(unpaidOnly: _historyUnpaidOnly)
+            : _pages[_currentIndex],
       ),
     );
 
