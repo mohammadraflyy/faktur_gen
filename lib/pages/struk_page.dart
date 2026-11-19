@@ -206,7 +206,8 @@ class _StrukFormState extends State<_StrukForm> {
     _struk.teleponToko = _settings.telepon;
     _struk.nomorStruk = _nomorCtrl.text.trim();
     _struk.namaKasir = _kasirCtrl.text.trim();
-    _struk.jumlahBayar = _paid.value;
+    _struk.jumlahBayar =
+        _struk.metodeBayar == MetodeBayar.tunai ? _paid.value : 0;
     _struk.catatan = _catatanCtrl.text;
   }
 
