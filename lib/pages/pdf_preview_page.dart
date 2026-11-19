@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
+import '../services/locale_service.dart';
 
 class PdfPreviewPage extends StatelessWidget {
   final String title;
@@ -35,7 +36,7 @@ class PdfPreviewPage extends StatelessWidget {
             onPressed: () => Navigator.of(context).pop(true),
             icon: Icon(Icons.check_rounded,
                 color: theme.colorScheme.primary, size: 20),
-            label: Text('Selesai',
+            label: Text(tr('common.done'),
                 style: TextStyle(
                     color: theme.colorScheme.primary,
                     fontWeight: FontWeight.w600)),

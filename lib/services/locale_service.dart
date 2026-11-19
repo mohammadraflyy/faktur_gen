@@ -524,4 +524,9 @@ const _strings = <String, List<String>>{
   'invoice.search_item': ['Cari item...', 'Search items...'],
   'invoice.catalog_empty': ['Katalog kosong. Tap "Baru" untuk menambah.', 'Catalog is empty. Tap "New" to add one.'],
   'item.discount': ['Diskon item', 'Item discount'],
+  'pdf.choose_action': ['Pilih aksi', 'Choose an action'],
+  'pdf.print': ['Cetak', 'Print'],
+  'pdf.print_hint': ['Cetak via printer', 'Print on a printer'],
+  'pdf.save_hint': ['Simpan atau bagikan PDF', 'Save or share the PDF'],
+  'pdf.whatsapp_hint': ['Kirim ke klien', 'Send to the client'],
 };

@@ -6,29 +6,18 @@ import 'package:url_launcher/url_launcher.dart';
 import '../utils/phone_utils.dart';
 
 class WhatsAppService {
-  /// Share invoice PDF via WhatsApp with pre-filled message.
-  static Future<void> shareInvoice({
-    required String clientName,
-    required String clientPhone,
-    required String invoiceNumber,
-    required String amount,
+  /// Shares a PDF with a prefilled message through the system share sheet,
+  /// where the user picks WhatsApp. A direct-to-number attachment is not
+  /// possible with url_launcher alone.
+  static Future<void> sharePdf({
     required Uint8List pdfBytes,
     required String filename,
+    required String message,
   }) async {
-    // Save PDF to temp file for sharing
     final dir = await getTemporaryDirectory();
     final file = File('${dir.path}/$filename');
     await file.writeAsBytes(pdfBytes);
-
-    final message = 'Halo $clientName,\n\n'
-        'Berikut invoice $invoiceNumber sebesar $amount.\n\n'
-        'Terima kasih.';
-
-    // Share PDF with message (lets user pick WhatsApp or other app)
-    await Share.shareXFiles(
-      [XFile(file.path)],
-      text: message,
-    );
+    await Share.shareXFiles([XFile(file.path)], text: message);
   }
 
   /// Open WhatsApp chat with pre-filled message (no attachment).

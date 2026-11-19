@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import '../main.dart';
+import '../services/locale_service.dart';
 
 enum PdfAction { print, download, whatsapp }
 
-/// Tampilkan bottom sheet pilihan Print / Download / WhatsApp.
-/// Mengembalikan [PdfAction] yang dipilih, atau null jika dibatalkan.
+/// Bottom sheet with Print / Save and, optionally, WhatsApp.
+/// Returns the chosen [PdfAction], or null when dismissed.
 Future<PdfAction?> showPdfActionSheet(
   BuildContext context, {
   required String docName,
@@ -11,9 +13,7 @@ Future<PdfAction?> showPdfActionSheet(
 }) {
   return showModalBottomSheet<PdfAction>(
     context: context,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
+    showDragHandle: true,
     builder: (_) => _PdfActionSheet(docName: docName, showWhatsApp: showWhatsApp),
   );
 }
@@ -28,37 +28,23 @@ class _PdfActionSheet extends StatelessWidget {
     final theme = Theme.of(context);
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // handle bar
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              docName,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
+            Text(docName,
+                style: theme.textTheme.titleMedium,
+                textAlign: TextAlign.center),
             const SizedBox(height: 4),
-            const Text(
-              'Pilih aksi yang ingin dilakukan',
-              style: TextStyle(fontSize: 13, color: Colors.grey),
-            ),
+            Text(tr('pdf.choose_action'), style: theme.textTheme.bodySmall),
             const SizedBox(height: 20),
             Row(
               children: [
                 Expanded(
                   child: _ActionTile(
                     icon: Icons.print,
-                    label: 'Print',
-                    sublabel: 'Cetak via printer',
+                    label: tr('pdf.print'),
+                    sublabel: tr('pdf.print_hint'),
                     color: theme.colorScheme.primary,
                     onTap: () => Navigator.pop(context, PdfAction.print),
                   ),
@@ -67,9 +53,9 @@ class _PdfActionSheet extends StatelessWidget {
                 Expanded(
                   child: _ActionTile(
                     icon: Icons.download,
-                    label: 'Download',
-                    sublabel: 'Simpan / bagikan PDF',
-                    color: const Color(0xFF2E7D32),
+                    label: tr('common.save'),
+                    sublabel: tr('pdf.save_hint'),
+                    color: AppColors.successFor(theme.brightness),
                     onTap: () => Navigator.pop(context, PdfAction.download),
                   ),
                 ),
@@ -79,7 +65,7 @@ class _PdfActionSheet extends StatelessWidget {
                     child: _ActionTile(
                       icon: Icons.chat,
                       label: 'WhatsApp',
-                      sublabel: 'Kirim ke klien',
+                      sublabel: tr('pdf.whatsapp_hint'),
                       color: const Color(0xFF25D366),
                       onTap: () => Navigator.pop(context, PdfAction.whatsapp),
                     ),
@@ -111,40 +97,27 @@ class _ActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Material(
       color: color.withValues(alpha: 0.08),
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
           child: Column(
             children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: color, size: 28),
-              ),
+              // The label carries the meaning; the tinted icon is decoration.
+              Icon(icon, color: color, size: 28),
               const SizedBox(height: 10),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
+              Text(label,
+                  style: theme.textTheme.titleSmall,
+                  textAlign: TextAlign.center),
               const SizedBox(height: 2),
-              Text(
-                sublabel,
-                style: const TextStyle(fontSize: 11, color: Colors.grey),
-                textAlign: TextAlign.center,
-              ),
+              Text(sublabel,
+                  style: theme.textTheme.bodySmall,
+                  textAlign: TextAlign.center),
             ],
           ),
         ),
