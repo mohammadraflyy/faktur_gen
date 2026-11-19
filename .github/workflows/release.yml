@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-    tags:
-      - 'v*'
   workflow_dispatch:
 
 permissions:
@@ -33,13 +31,8 @@ jobs:
       - name: Determine Version
         id: ver
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            TAG="${GITHUB_REF#refs/tags/}"
-            VER="${TAG#v}"
-          else
-            TAG="v1.0.${{ github.run_number }}"
-            VER="1.0.${{ github.run_number }}"
-          fi
+          TAG="v1.0.${{ github.run_number }}"
+          VER="1.0.${{ github.run_number }}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=$VER" >> "$GITHUB_OUTPUT"
           sed -i "s/^version: .*/version: $VER+${{ github.run_number }}/" pubspec.yaml
@@ -51,6 +44,7 @@ jobs:
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
+          [ -n "$KEYSTORE_BASE64" ] || { echo "::error::Android signing secrets missing"; exit 1; }
           echo "$KEYSTORE_BASE64" | base64 --decode > android/app/release.jks
           cat > android/key.properties <<EOF
           storeFile=release.jks
