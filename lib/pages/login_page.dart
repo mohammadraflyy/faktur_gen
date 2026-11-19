@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
 import '../services/locale_service.dart';
 import '../services/migration_service.dart';
@@ -59,22 +58,13 @@ class _LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 20),
                 Text(
                   'Faktura',
-                  style: GoogleFonts.inter(
-                    fontSize: 30,
-                    fontWeight: FontWeight.w700,
-                    color: theme.colorScheme.onSurface,
-                    letterSpacing: -0.5,
-                  ),
+                  style: theme.textTheme.displaySmall,
                 ),
                 const SizedBox(height: 8),
                 Text(
                   tr('auth.sign_in_subtitle'),
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                    height: 1.5,
-                  ),
+                  style: theme.textTheme.bodySmall,
                 ),
                 const SizedBox(height: 40),
                 // Google Sign-In button
@@ -106,10 +96,6 @@ class _LoginPageState extends State<LoginPage> {
                       _isLoading
                           ? tr('auth.signing_in')
                           : tr('auth.sign_in'),
-                      style: GoogleFonts.inter(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
                     ),
                     style: OutlinedButton.styleFrom(
                       shape: RoundedRectangleBorder(
@@ -127,13 +113,7 @@ class _LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: _isLoading ? null : widget.onSkip,
-                  child: Text(
-                    tr('auth.skip'),
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
-                    ),
-                  ),
+                  child: Text(tr('auth.skip')),
                 ),
                 const Spacer(flex: 4),
               ],

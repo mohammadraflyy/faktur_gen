@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
+import '../services/locale_service.dart';
 import '../services/migration_service.dart';
 import '../widgets/app_logo.dart';
 import 'login_page.dart';
@@ -82,7 +82,9 @@ class _SplashWrapperState extends State<SplashWrapper> {
   @override
   Widget build(BuildContext context) {
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 400),
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 400),
       child: switch (_screen) {
         _Screen.splash => const _SplashContent(key: ValueKey('splash')),
         _Screen.onboarding => OnboardingPage(
@@ -116,16 +118,16 @@ class _SplashContentState extends State<_SplashContent>
   late final Animation<double> _tipOpacity;
 
   static const _tips = [
-    'Atur profil toko di Pengaturan untuk invoice lebih profesional',
-    'Tambahkan logo dan tanda tangan untuk branding yang konsisten',
-    'Gunakan template untuk mempercepat pembuatan invoice berulang',
-    'Atur pengingat layanan agar tidak terlewat jadwal pelanggan',
-    'Export data ke CSV untuk pembukuan yang lebih rapi',
-    'Simpan kontak pelanggan untuk auto-fill di invoice berikutnya',
-    'Gunakan katalog item untuk menambahkan produk dengan cepat',
-    'Backup data secara berkala untuk keamanan dokumen Anda',
-    'Struk bisa langsung dicetak ke printer thermal 80mm',
-    'Aktifkan dark mode untuk kenyamanan mata di malam hari',
+    'splash.tip_1',
+    'splash.tip_2',
+    'splash.tip_3',
+    'splash.tip_4',
+    'splash.tip_5',
+    'splash.tip_6',
+    'splash.tip_7',
+    'splash.tip_8',
+    'splash.tip_9',
+    'splash.tip_10',
   ];
 
   late final String _tip;
@@ -174,6 +176,9 @@ class _SplashContentState extends State<_SplashContent>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    // Reduced motion: show the end state right away.
+    final still = MediaQuery.disableAnimationsOf(context);
+    double v(Animation<double> a) => still ? 1 : a.value;
 
     return Scaffold(
       body: Center(
@@ -184,41 +189,31 @@ class _SplashContentState extends State<_SplashContent>
               mainAxisSize: MainAxisSize.min,
               children: [
                 Opacity(
-                  opacity: _logoOpacity.value,
+                  opacity: v(_logoOpacity),
                   child: Transform.scale(
-                    scale: _logoScale.value,
+                    scale: v(_logoScale),
                     child: const AppLogo(size: 88),
                   ),
                 ),
                 const SizedBox(height: 20),
                 Opacity(
-                  opacity: _textOpacity.value,
+                  opacity: v(_textOpacity),
                   child: Text(
                     'Faktura',
-                    style: GoogleFonts.inter(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w700,
-                      color: theme.colorScheme.onSurface,
-                      letterSpacing: -0.5,
-                    ),
+                    style: theme.textTheme.displaySmall,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Opacity(
-                  opacity: _textOpacity.value,
+                  opacity: v(_textOpacity),
                   child: Text(
-                    'Invoice & Struk Profesional',
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w400,
-                      color: theme.colorScheme.onSurface
-                          .withValues(alpha: 0.45),
-                    ),
+                    tr('about.subtitle'),
+                    style: theme.textTheme.bodySmall,
                   ),
                 ),
                 const SizedBox(height: 48),
                 Opacity(
-                  opacity: _tipOpacity.value,
+                  opacity: v(_tipOpacity),
                   child: Container(
                     margin: const EdgeInsets.symmetric(horizontal: 40),
                     padding: const EdgeInsets.symmetric(
@@ -243,13 +238,9 @@ class _SplashContentState extends State<_SplashContent>
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            _tip,
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              height: 1.5,
-                              color: theme.colorScheme.onSurface
-                                  .withValues(alpha: 0.6),
-                            ),
+                            tr(_tip),
+                            style: theme.textTheme.bodySmall
+                                ?.copyWith(color: theme.colorScheme.onSurface),
                           ),
                         ),
                       ],
