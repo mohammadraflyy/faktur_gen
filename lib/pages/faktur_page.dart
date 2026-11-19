@@ -234,7 +234,7 @@ class _FakturPageState extends State<FakturPage> {
     final result = await showItemEditSheet(context,
         item: ItemFaktur(), currency: _currency, isNew: true);
     if (result == null || result.deleted) return;
-    _isDirty = true;
+    if (!_isDirty) setState(() => _isDirty = true);
     _items.value = [..._items.value, result.item!];
   }
 
@@ -246,14 +246,14 @@ class _FakturPageState extends State<FakturPage> {
       _removeItem(index);
       return;
     }
-    _isDirty = true;
+    if (!_isDirty) setState(() => _isDirty = true);
     _items.value = [..._items.value]..[index] = result.item!;
   }
 
   void _removeItem(int index) {
     final list = [..._items.value];
     final removed = list.removeAt(index);
-    _isDirty = true;
+    if (!_isDirty) setState(() => _isDirty = true);
     _items.value = list;
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
@@ -265,6 +265,7 @@ class _FakturPageState extends State<FakturPage> {
         action: SnackBarAction(
           label: tr('common.undo'),
           onPressed: () {
+            if (!mounted) return;
             final restored = [..._items.value];
             restored.insert(index.clamp(0, restored.length), removed);
             _items.value = restored;
@@ -457,7 +458,7 @@ class _FakturPageState extends State<FakturPage> {
       ),
     );
     if (selected == null) return;
-    _isDirty = true;
+    if (!_isDirty) setState(() => _isDirty = true);
     _items.value = [
       ..._items.value,
       ItemFaktur(
