@@ -73,7 +73,11 @@ void main() {
       }
     });
 
-    test('button label on primary, both themes and struk green', () {
+    // testWidgets, not test: MyApp.light/dark build Inter text styles, and the
+    // font load failure would otherwise leak into the next test.
+    testWidgets('button label on primary, both themes and struk green', (
+      tester,
+    ) async {
       final light = MyApp.light().colorScheme;
       final dark = MyApp.dark().colorScheme;
       expect(_contrast(light.onPrimary, light.primary), greaterThanOrEqualTo(4.5));
