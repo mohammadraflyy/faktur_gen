@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -128,10 +129,6 @@ class MyApp extends StatelessWidget {
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: ThemeService.themeNotifier,
       builder: (context, themeMode, _) {
-        final isDark = themeMode == ThemeMode.dark;
-        SystemChrome.setSystemUIOverlayStyle(
-          isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
-        );
         return ValueListenableBuilder<AppLanguage>(
           valueListenable: LocaleService.languageNotifier,
           builder: (context, _, _) => MaterialApp(
@@ -141,6 +138,13 @@ class MyApp extends StatelessWidget {
           themeMode: themeMode,
           theme: light(),
           darkTheme: dark(),
+          // Resolved brightness, so ThemeMode.system also gets the right icons.
+          builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+            value: Theme.of(context).brightness == Brightness.dark
+                ? SystemUiOverlayStyle.light
+                : SystemUiOverlayStyle.dark,
+            child: child!,
+          ),
           home: const SplashWrapper(),
         ),
         );
@@ -150,7 +154,8 @@ class MyApp extends StatelessWidget {
 
   static ThemeData light() {
     final base = ThemeData.light(useMaterial3: true);
-    final txt = GoogleFonts.interTextTheme(base.textTheme);
+    final txt = _text(
+        base.textTheme, const Color(0xFF111827), const Color(0xFF6B7280));
     return base.copyWith(
       colorScheme: ColorScheme.fromSeed(
         seedColor: _primary,
@@ -161,7 +166,7 @@ class MyApp extends StatelessWidget {
         surface: const Color(0xFFFAFBFC),
         onSurface: const Color(0xFF111827),
       ),
-      scaffoldBackgroundColor: const Color(0xFFF8F9FB),
+      scaffoldBackgroundColor: Colors.white,
       textTheme: txt,
       primaryTextTheme: txt,
       inputDecorationTheme: _input(false),
@@ -169,10 +174,11 @@ class MyApp extends StatelessWidget {
       appBarTheme: _appBar(false),
       elevatedButtonTheme: _elevatedBtn(),
       textButtonTheme: _textBtn(),
-      dividerTheme: DividerThemeData(
-        color: Colors.grey.shade200,
-        thickness: 0.5,
-        space: 16,
+      pageTransitionsTheme: _pageTransitions,
+      dividerTheme: const DividerThemeData(
+        color: Color(0xFFF0F1F3),
+        thickness: 1,
+        space: 1,
       ),
       dialogTheme: DialogThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -187,7 +193,8 @@ class MyApp extends StatelessWidget {
 
   static ThemeData dark() {
     final base = ThemeData.dark(useMaterial3: true);
-    final txt = GoogleFonts.interTextTheme(base.textTheme);
+    final txt = _text(
+        base.textTheme, const Color(0xFFF3F4F6), const Color(0xFF9CA3AF));
     return base.copyWith(
       colorScheme: ColorScheme.fromSeed(
         seedColor: _primary,
@@ -207,10 +214,11 @@ class MyApp extends StatelessWidget {
       appBarTheme: _appBar(true),
       elevatedButtonTheme: _elevatedBtn(),
       textButtonTheme: _textBtn(),
+      pageTransitionsTheme: _pageTransitions,
       dividerTheme: const DividerThemeData(
         color: Color(0xFF252836),
-        thickness: 0.5,
-        space: 16,
+        thickness: 1,
+        space: 1,
       ),
       dialogTheme: DialogThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -224,6 +232,37 @@ class MyApp extends StatelessWidget {
       ),
     );
   }
+
+  // Six sizes only: 32 / 22 / 17 / 15 / 13 / 12. bodyMedium is the default
+  // for plain Text, so it stays at body size and primary color.
+  static TextTheme _text(TextTheme base, Color strong, Color muted) {
+    final t = GoogleFonts.interTextTheme(base).apply(
+      bodyColor: strong,
+      displayColor: strong,
+    );
+    TextStyle s(TextStyle? x, double size, FontWeight w) =>
+        x!.copyWith(fontSize: size, fontWeight: w, height: 1.3);
+    return t.copyWith(
+      displaySmall: s(t.displaySmall, 32, FontWeight.w700),
+      headlineSmall: s(t.headlineSmall, 22, FontWeight.w700),
+      titleLarge: s(t.titleLarge, 22, FontWeight.w700),
+      titleMedium: s(t.titleMedium, 17, FontWeight.w600),
+      titleSmall: s(t.titleSmall, 15, FontWeight.w600),
+      bodyLarge: s(t.bodyLarge, 15, FontWeight.w400),
+      bodyMedium: s(t.bodyMedium, 15, FontWeight.w400),
+      bodySmall: s(t.bodySmall, 13, FontWeight.w400).copyWith(color: muted),
+      labelLarge: s(t.labelLarge, 15, FontWeight.w600),
+      labelMedium: s(t.labelMedium, 12, FontWeight.w600),
+      labelSmall: s(t.labelSmall, 12, FontWeight.w500),
+    );
+  }
+
+  static const _pageTransitions = PageTransitionsTheme(
+    builders: {
+      TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
+      TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+    },
+  );
 
   static CardThemeData _card(bool dark) => CardThemeData(
         elevation: dark ? 0 : 0,
@@ -243,10 +282,10 @@ class MyApp extends StatelessWidget {
         elevation: 0,
         scrolledUnderElevation: 0.5,
         centerTitle: false,
-        backgroundColor: dark ? const Color(0xFF0F1117) : const Color(0xFFF8F9FB),
+        backgroundColor: dark ? const Color(0xFF0F1117) : Colors.white,
         foregroundColor: dark ? Colors.white : const Color(0xFF111827),
         titleTextStyle: GoogleFonts.inter(
-          fontSize: 18,
+          fontSize: 17,
           fontWeight: FontWeight.w600,
           color: dark ? Colors.white : const Color(0xFF111827),
         ),
@@ -256,65 +295,66 @@ class MyApp extends StatelessWidget {
         ),
       );
 
-  static InputDecorationTheme _input(bool dark) => InputDecorationTheme(
-        filled: true,
-        fillColor: dark ? const Color(0xFF1F2233) : const Color(0xFFF9FAFB),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(
-            color: dark ? const Color(0xFF2D3044) : const Color(0xFFE5E7EB),
-          ),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(
-            color: dark ? const Color(0xFF2D3044) : const Color(0xFFE5E7EB),
-          ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(
-            color: dark ? const Color(0xFF60A5FA) : _primary,
-            width: 1.5,
-          ),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: Color(0xFFEF4444)),
-        ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        isDense: true,
-        labelStyle: GoogleFonts.inter(
-          fontSize: 13,
-          color: dark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
-        ),
-        hintStyle: GoogleFonts.inter(
-          fontSize: 13,
-          color: dark ? const Color(0xFF6B7280) : const Color(0xFF9CA3AF),
-        ),
-        floatingLabelStyle: GoogleFonts.inter(
-          fontSize: 13,
+  static InputDecorationTheme _input(bool dark) {
+    final radius = BorderRadius.circular(12);
+    final error = dark ? AppColors.errorSoft : AppColors.error;
+    return InputDecorationTheme(
+      filled: true,
+      fillColor: dark ? const Color(0xFF1F2233) : const Color(0xFFF3F4F6),
+      border:
+          OutlineInputBorder(borderRadius: radius, borderSide: BorderSide.none),
+      enabledBorder:
+          OutlineInputBorder(borderRadius: radius, borderSide: BorderSide.none),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: radius,
+        borderSide: BorderSide(
           color: dark ? const Color(0xFF60A5FA) : _primary,
+          width: 2,
         ),
-      );
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: radius,
+        borderSide: BorderSide(color: error, width: 1.5),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: radius,
+        borderSide: BorderSide(color: error, width: 2),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      labelStyle: GoogleFonts.inter(
+        fontSize: 13,
+        color: dark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+      ),
+      // #6B7280 on #F3F4F6 is 4.39:1, below AA.
+      hintStyle: GoogleFonts.inter(
+        fontSize: 15,
+        color: dark ? const Color(0xFF9CA3AF) : const Color(0xFF4B5563),
+      ),
+      floatingLabelStyle: GoogleFonts.inter(
+        fontSize: 13,
+        color: dark ? const Color(0xFF60A5FA) : _primary,
+      ),
+    );
+  }
 
   static ElevatedButtonThemeData _elevatedBtn() => ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           elevation: 0,
+          minimumSize: const Size(64, 48),
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
           ),
           textStyle:
-              GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600),
+              GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600),
         ),
       );
 
   static TextButtonThemeData _textBtn() => TextButtonThemeData(
         style: TextButton.styleFrom(
+          minimumSize: const Size(48, 48),
           textStyle:
-              GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
+              GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600),
         ),
       );
 }

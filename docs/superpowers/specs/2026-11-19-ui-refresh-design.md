@@ -113,7 +113,7 @@ Tidak ditata ulang; hanya ikut sistem desain (tema, teks, kontras, `tr()`).
 | Momen | Gerak | Durasi | Cara |
 |---|---|---|---|
 | Pindah tab | fade + naik 8px | 200ms | `AnimatedSwitcher`; swipe `PageView` dimatikan di semua tab |
-| Buka halaman | fade maju | 300ms | `FadeForwardsPageTransitionsBuilder` di `pageTransitionsTheme` (ada di SDK lokal) |
+| Buka halaman | fade maju | 450ms (tetap, bawaan builder) | `FadeForwardsPageTransitionsBuilder` di `pageTransitionsTheme` (ada di SDK lokal) |
 | Sheet | naik, tarik untuk tutup | 250ms | `showModalBottomSheet` |
 | Tambah/hapus item | tinggi membuka/menutup | 200ms | `AnimatedList` + `SizeTransition` |
 | Total berubah | fade silang | 150ms | `AnimatedSwitcher` |
