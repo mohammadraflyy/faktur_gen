@@ -1,0 +1,82 @@
+name: Build & Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Determine Version
+        id: ver
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+            VER="${TAG#v}"
+          else
+            TAG="v1.0.${{ github.run_number }}"
+            VER="1.0.${{ github.run_number }}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          sed -i "s/^version: .*/version: $VER+${{ github.run_number }}/" pubspec.yaml
+
+      - name: Setup Signing Key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/release.jks
+          cat > android/key.properties <<EOF
+          storeFile=release.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+
+      - name: Build Android Release APK (Split per ABI)
+        run: |
+          flutter pub get
+          flutter build apk --release --split-per-abi --dart-define=APP_VERSION=${{ steps.ver.outputs.version }} --build-name=${{ steps.ver.outputs.version }} --build-number=${{ github.run_number }}
+
+      - name: Prepare Android Artifact
+        run: |
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk Faktura.apk
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk Faktura-v7a.apk
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: Release ${{ steps.ver.outputs.tag }}
+          files: |
+            Faktura.apk
+            Faktura-v7a.apk
+          generate_release_notes: true
+          draft: false
+          prerelease: false
