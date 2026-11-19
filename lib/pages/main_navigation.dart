@@ -30,6 +30,8 @@ class _MainNavigationState extends State<MainNavigation> {
   AppUpdateInfo? _availableUpdate;
   bool _dismissedUpdate = false;
   Timer? _updateCheckTimer;
+  // Bumped after a create flow closes so the tab remounts and reloads.
+  int _pageGeneration = 0;
 
   static const _pages = [
     DashboardPage(),
@@ -119,6 +121,13 @@ class _MainNavigationState extends State<MainNavigation> {
     if (index == 0 || index == 2) _loadDueCount();
   }
 
+  Future<void> _openCreatePage(Widget page) async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+    if (!mounted) return;
+    setState(() => _pageGeneration++);
+    _loadDueCount();
+  }
+
   void _showCreateSheet() {
     final theme = Theme.of(context);
     showModalBottomSheet(
@@ -160,8 +169,7 @@ class _MainNavigationState extends State<MainNavigation> {
                       color: theme.colorScheme.primary,
                       onTap: () {
                         Navigator.pop(context);
-                        Navigator.push(context,
-                            MaterialPageRoute(builder: (_) => const FakturPage()));
+                        _openCreatePage(const FakturPage());
                       },
                     ),
                   ),
@@ -174,8 +182,7 @@ class _MainNavigationState extends State<MainNavigation> {
                       color: theme.colorScheme.secondary,
                       onTap: () {
                         Navigator.pop(context);
-                        Navigator.push(context,
-                            MaterialPageRoute(builder: (_) => const StrukPage()));
+                        _openCreatePage(const StrukPage());
                       },
                     ),
                   ),
@@ -211,7 +218,7 @@ class _MainNavigationState extends State<MainNavigation> {
         ),
       ),
       child: KeyedSubtree(
-        key: ValueKey(_currentIndex),
+        key: ValueKey('$_currentIndex-$_pageGeneration'),
         child: _pages[_currentIndex],
       ),
     );
