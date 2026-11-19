@@ -389,4 +389,7 @@ const _strings = <String, List<String>>{
   'item.price': ['Harga satuan', 'Unit price'],
   'item.unit': ['Satuan', 'Unit'],
   'item.delete': ['Hapus item', 'Delete item'],
+  'common.total': ['Total', 'Total'],
+  'common.generating': ['Membuat…', 'Creating…'],
+  'common.done': ['Selesai', 'Done'],
 };
