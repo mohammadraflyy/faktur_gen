@@ -199,9 +199,9 @@ const _strings = <String, List<String>>{
 
   // ─── Settings ────────────────────────────────────────────────────────────
   'settings.title': ['Pengaturan', 'Settings'],
-  'settings.general': ['UMUM', 'GENERAL'],
-  'settings.documents': ['DOKUMEN', 'DOCUMENTS'],
-  'settings.app': ['APLIKASI', 'APP'],
+  'settings.group_store': ['Toko', 'Store'],
+  'settings.documents': ['Dokumen', 'Documents'],
+  'settings.app': ['Aplikasi', 'App'],
   'settings.store_profile': ['Profil Toko', 'Store Profile'],
   'settings.contact': ['Kontak', 'Contact'],
   'settings.payment_info': ['Informasi Pembayaran', 'Payment Info'],

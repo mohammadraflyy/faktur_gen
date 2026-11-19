@@ -1,5 +1,6 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../models/settings_model.dart';
 import '../models/subscription_model.dart';
 import '../services/auth_service.dart';
@@ -22,10 +23,6 @@ import 'settings/signature_sub_page.dart';
 import 'settings/struk_sub_page.dart';
 import 'settings/template_sub_page.dart';
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Settings Hub — menu list that navigates to sub-pages
-// ═══════════════════════════════════════════════════════════════════════════════
-
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
@@ -37,22 +34,45 @@ class _SettingsPageState extends State<SettingsPage> {
   SettingsModel _settings = SettingsModel();
   SubscriptionModel _sub = SubscriptionModel();
   bool _isLoading = true;
+  // Nothing for the first 300ms, then a loading text, so a fast load
+  // never flashes a spinner.
+  bool _showLoadingText = false;
+  Timer? _loadingTimer;
 
   @override
   void initState() {
     super.initState();
+    _loadingTimer = Timer(const Duration(milliseconds: 300), () {
+      if (mounted && _isLoading) setState(() => _showLoadingText = true);
+    });
     _load();
+  }
+
+  @override
+  void dispose() {
+    _loadingTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
     final s = await SettingsService.load();
     final sub = await SubscriptionService.load();
+    _loadingTimer?.cancel();
     if (mounted) setState(() { _settings = s; _sub = sub; _isLoading = false; });
   }
 
   Future<void> _push(Widget page) async {
     await Navigator.push(context, MaterialPageRoute(builder: (_) => page));
     _load(); // refresh after returning
+  }
+
+  // Free users get the paywall instead of a Pro page.
+  void _pushPro(Widget page) {
+    if (!_sub.isPro) {
+      showPaywallSheet(context);
+      return;
+    }
+    _push(page);
   }
 
   @override
@@ -62,300 +82,179 @@ class _SettingsPageState extends State<SettingsPage> {
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(title: Text(tr('settings.title'))),
-        body: const Center(child: CircularProgressIndicator()),
+        body: Center(
+          child: _showLoadingText
+              ? Text(tr('dashboard.loading'), style: theme.textTheme.bodySmall)
+              : const SizedBox.shrink(),
+        ),
       );
     }
+
+    final notSet = tr('settings.not_set');
+    final isSet = tr('settings.already_set');
+    // Written label instead of the old orange badge.
+    final pro = _sub.isPro ? null : 'Pro';
 
     return Scaffold(
       appBar: AppBar(title: Text(tr('settings.title'))),
       body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.only(top: 8, bottom: 32),
         children: [
-          // Subscription
-          _buildSubscriptionCard(theme),
-          const SizedBox(height: 16),
-          // Profile header
-          _buildProfileHeader(theme),
-          const SizedBox(height: 16),
-          _sectionLabel(theme, tr('settings.general')),
-          _menuTile(
-            theme,
-            icon: Icons.storefront_outlined,
-            title: tr('settings.store_profile'),
-            subtitle: _settings.namaToko.isNotEmpty
-                ? _settings.namaToko
-                : tr('settings.not_set'),
-            onTap: () => _push(ProfileSubPage(settings: _settings)),
+          SettingsHeader(
+            settings: _settings,
+            sub: _sub,
+            onUpgrade: () => showPaywallSheet(context).then((_) => _load()),
           ),
-          _menuTile(
-            theme,
-            icon: Icons.contact_phone_outlined,
-            title: tr('settings.contact'),
-            subtitle: _settings.telepon.isNotEmpty
-                ? _settings.telepon
-                : tr('settings.not_set'),
-            onTap: () => _push(ContactSubPage(settings: _settings)),
-          ),
-          _menuTile(
-            theme,
-            icon: Icons.account_balance_outlined,
-            title: tr('settings.payment_info'),
-            subtitle: _settings.bankAccounts.isNotEmpty &&
-                    _settings.bankAccounts.first.namaBank.isNotEmpty
-                ? '${_settings.bankAccounts.length} ${tr('settings.accounts')}'
-                : tr('settings.not_set'),
-            onTap: () => _push(BankSubPage(settings: _settings)),
-          ),
-          const SizedBox(height: 8),
-          _sectionLabel(theme, tr('settings.documents')),
-          _menuTile(
-            theme,
-            icon: Icons.style_outlined,
-            title: tr('template.title'),
-            subtitle:
-                '${_settings.templateConfig.invoiceTemplate.label} · ${_settings.templateConfig.strukTemplate.label}',
-            onTap: () => _push(TemplateSubPage(settings: _settings)),
-          ),
-          _menuTile(
-            theme,
-            icon: Icons.tune_outlined,
-            title: tr('settings.tax_doc'),
-            subtitle:
-                'PPN ${_settings.taxRate}% · ${_settings.currency}',
-            onTap: () => _push(InvoiceSettingsSubPage(settings: _settings)),
-          ),
-          _menuTile(
-            theme,
-            icon: Icons.receipt_outlined,
-            title: tr('settings.receipt_settings'),
-            subtitle: _settings.footerStruk.isNotEmpty
-                ? _settings.footerStruk
-                : 'Default',
-            onTap: () => _push(StrukSubPage(settings: _settings)),
-          ),
-          _menuTile(
-            theme,
-            icon: Icons.draw_outlined,
-            title: tr('settings.signature'),
-            subtitle: _settings.hasSignature ? tr('settings.already_set') : tr('settings.not_set'),
-            onTap: () => _push(SignatureSubPage(settings: _settings)),
-          ),
-          _menuTile(
-            theme,
-            icon: Icons.qr_code_2_rounded,
-            title: tr('settings.qris'),
-            subtitle: _settings.qrisMerchantId.isNotEmpty
-                ? tr('settings.already_set')
-                : tr('settings.not_set'),
-            onTap: () {
-              if (!_sub.isPro) { showPaywallSheet(context); return; }
-              _push(QrisSubPage(settings: _settings));
-            },
-            trailing: _sub.isPro ? null : _proBadge(theme),
-          ),
-          _menuTile(
-            theme,
-            icon: Icons.repeat_rounded,
-            title: tr('recurring.title'),
-            subtitle: tr('recurring.subtitle'),
-            onTap: () {
-              if (!_sub.isPro) { showPaywallSheet(context); return; }
-              _push(const RecurringInvoicePage());
-            },
-            trailing: _sub.isPro ? null : _proBadge(theme),
-          ),
-          const SizedBox(height: 8),
-          _sectionLabel(theme, tr('auth.account')),
-          _buildAccountTile(theme),
-          const SizedBox(height: 8),
-          _sectionLabel(theme, tr('settings.app')),
-          _buildThemeTile(theme),
-          _buildLanguageTile(theme),
-          _menuTile(
-            theme,
-            icon: Icons.backup_outlined,
-            title: tr('settings.backup'),
-            subtitle: tr('settings.backup_subtitle'),
-            onTap: () => _push(BackupSubPage()),
-          ),
-          _menuTile(
-            theme,
-            icon: Icons.science_outlined,
-            title: tr('sandbox.title'),
-            subtitle: tr('sandbox.subtitle'),
-            onTap: () => _push(const SandboxSubPage()),
-          ),
-          _menuTile(
-            theme,
-            icon: Icons.info_outline,
-            title: tr('about.title'),
-            subtitle: tr('about.subtitle'),
-            onTap: () => _push(const AboutSubPage()),
-          ),
-          if (updaterSupported)
-            _menuTile(
+          _group(theme, tr('settings.group_store'), [
+            _row(
               theme,
-              icon: Icons.system_update_outlined,
-              title: tr('update.check'),
-              subtitle: tr('update.check_sub'),
-              onTap: () => promptAppUpdate(context),
+              tr('settings.store_profile'),
+              _settings.namaToko.isNotEmpty ? _settings.namaToko : notSet,
+              () => _push(ProfileSubPage(settings: _settings)),
             ),
+            _row(
+              theme,
+              tr('settings.contact'),
+              _settings.telepon.isNotEmpty ? _settings.telepon : notSet,
+              () => _push(ContactSubPage(settings: _settings)),
+            ),
+            _row(
+              theme,
+              tr('settings.payment_info'),
+              _settings.bankAccounts.isNotEmpty &&
+                      _settings.bankAccounts.first.namaBank.isNotEmpty
+                  ? '${_settings.bankAccounts.length} ${tr('settings.accounts')}'
+                  : notSet,
+              () => _push(BankSubPage(settings: _settings)),
+            ),
+            _row(
+              theme,
+              tr('settings.qris'),
+              pro ?? (_settings.qrisMerchantId.isNotEmpty ? isSet : notSet),
+              () => _pushPro(QrisSubPage(settings: _settings)),
+            ),
+            _row(
+              theme,
+              tr('settings.signature'),
+              _settings.hasSignature ? isSet : notSet,
+              () => _push(SignatureSubPage(settings: _settings)),
+            ),
+          ]),
+          _group(theme, tr('settings.documents'), [
+            _row(
+              theme,
+              tr('template.title'),
+              '${_settings.templateConfig.invoiceTemplate.label} · ${_settings.templateConfig.strukTemplate.label}',
+              () => _push(TemplateSubPage(settings: _settings)),
+            ),
+            _row(
+              theme,
+              tr('settings.tax_doc'),
+              'PPN ${_settings.taxRate}% · ${_settings.currency}',
+              () => _push(InvoiceSettingsSubPage(settings: _settings)),
+            ),
+            _row(
+              theme,
+              tr('settings.receipt_settings'),
+              _settings.footerStruk.isNotEmpty
+                  ? _settings.footerStruk
+                  : 'Default',
+              () => _push(StrukSubPage(settings: _settings)),
+            ),
+            _row(theme, tr('recurring.title'), pro,
+                () => _pushPro(const RecurringInvoicePage())),
+          ]),
+          _group(theme, tr('settings.app'), [
+            _accountRow(theme),
+            ValueListenableBuilder<ThemeMode>(
+              valueListenable: ThemeService.themeNotifier,
+              builder: (_, mode, _) => _row(
+                theme,
+                tr('appearance.title'),
+                switch (mode) {
+                  ThemeMode.dark => tr('appearance.dark'),
+                  ThemeMode.light => tr('appearance.light'),
+                  ThemeMode.system => tr('appearance.system'),
+                },
+                () => _showThemePicker(theme),
+              ),
+            ),
+            ValueListenableBuilder<AppLanguage>(
+              valueListenable: LocaleService.languageNotifier,
+              builder: (_, lang, _) => _row(theme, tr('settings.language'),
+                  lang.label, () => _showLanguagePicker(theme)),
+            ),
+            _row(theme, tr('settings.backup'), null,
+                () => _push(BackupSubPage())),
+            if (kDebugMode)
+              _row(theme, tr('sandbox.title'), null,
+                  () => _push(const SandboxSubPage())),
+            _row(theme, tr('about.title'), UpdaterService.currentAppVersion,
+                () => _push(const AboutSubPage())),
+            if (updaterSupported)
+              _row(theme, tr('update.check'), null,
+                  () => promptAppUpdate(context)),
+          ]),
         ],
       ),
     );
   }
 
-  Widget _buildProfileHeader(ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-      child: Row(
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: _settings.hasLogo
-                  ? null
-                  : theme.colorScheme.primary.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(14),
-              image: _settings.hasLogo
-                  ? DecorationImage(
-                      image: MemoryImage(_settings.logoBytes!),
-                      fit: BoxFit.contain,
-                    )
-                  : null,
-            ),
-            child: _settings.hasLogo
-                ? null
-                : Icon(Icons.storefront_outlined,
-                    color: theme.colorScheme.primary, size: 26),
+  Widget _group(ThemeData theme, String title, List<Widget> rows) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 32, 20, 4),
+          child: Semantics(
+            header: true,
+            child: Text(title, style: theme.textTheme.bodySmall),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _settings.namaToko.isNotEmpty
-                      ? _settings.namaToko
-                      : 'Faktura',
-                  style: GoogleFonts.inter(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
-                if (_settings.alamat.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    _settings.alamat,
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      color:
-                          theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ],
-            ),
-          ),
+        ),
+        for (var i = 0; i < rows.length; i++) ...[
+          if (i > 0) const Divider(height: 1, indent: 20, endIndent: 20),
+          rows[i],
         ],
-      ),
+      ],
     );
   }
 
-  Widget _proBadge(ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFA000).withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text('PRO',
-        style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700,
-          color: const Color(0xFFFFA000))),
-    );
-  }
-
-  Widget _buildSubscriptionCard(ThemeData theme) {
-    final isPro = _sub.isPro;
-    final remaining = SubscriptionService.freeMonthlyLimit - _sub.monthlyDocCount;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Card(
-        child: InkWell(
-          onTap: isPro ? null : () => showPaywallSheet(context).then((_) => _load()),
-          borderRadius: BorderRadius.circular(14),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  width: 44, height: 44,
-                  decoration: BoxDecoration(
-                    color: isPro
-                        ? const Color(0xFFFFA000).withValues(alpha: 0.15)
-                        : theme.colorScheme.primary.withValues(alpha: 0.08),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    isPro ? Icons.workspace_premium_rounded : Icons.star_outline_rounded,
-                    color: isPro ? const Color(0xFFFFA000) : theme.colorScheme.primary,
-                    size: 22,
-                  ),
+  // Title on the left, current value on the right (mockup 05).
+  Widget _row(
+      ThemeData theme, String title, String? value, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            Expanded(child: Text(title, style: theme.textTheme.bodyLarge)),
+            if (value != null) ...[
+              const SizedBox(width: 16),
+              Flexible(
+                child: Text(
+                  value,
+                  style: theme.textTheme.bodySmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.end,
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isPro ? tr('sub.pro') : tr('sub.free'),
-                        style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600,
-                          color: theme.colorScheme.onSurface),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        isPro
-                            ? tr('sub.unlimited')
-                            : '$remaining ${tr('sub.docs_remaining')}',
-                        style: GoogleFonts.inter(fontSize: 12,
-                          color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
-                      ),
-                    ],
-                  ),
-                ),
-                if (!isPro)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFA000),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(tr('sub.upgrade'),
-                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600,
-                        color: Colors.white)),
-                  ),
-              ],
-            ),
-          ),
+              ),
+            ],
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildAccountTile(ThemeData theme) {
+  Widget _accountRow(ThemeData theme) {
     final user = AuthService.currentUser;
     if (user != null) {
-      return _menuTile(
+      return _row(
         theme,
-        icon: Icons.account_circle_outlined,
-        title: user.displayName ?? user.email ?? tr('auth.account'),
-        subtitle: user.email ?? '',
-        onTap: () async {
+        tr('auth.account'),
+        user.email ?? user.displayName,
+        () async {
           final confirm = await showDialog<bool>(
             context: context,
             builder: (ctx) => AlertDialog(
@@ -380,12 +279,11 @@ class _SettingsPageState extends State<SettingsPage> {
         },
       );
     }
-    return _menuTile(
+    return _row(
       theme,
-      icon: Icons.login_rounded,
-      title: tr('auth.sign_in'),
-      subtitle: tr('auth.not_signed_in'),
-      onTap: () async {
+      tr('auth.sign_in'),
+      tr('auth.not_signed_in'),
+      () async {
         try {
           await AuthService.signInWithGoogle();
           if (mounted) setState(() {});
@@ -396,21 +294,6 @@ class _SettingsPageState extends State<SettingsPage> {
             );
           }
         }
-      },
-    );
-  }
-
-  Widget _buildLanguageTile(ThemeData theme) {
-    return ValueListenableBuilder<AppLanguage>(
-      valueListenable: LocaleService.languageNotifier,
-      builder: (context, lang, _) {
-        return _menuTile(
-          theme,
-          icon: Icons.language_rounded,
-          title: tr('settings.language'),
-          subtitle: lang.label,
-          onTap: () => _showLanguagePicker(theme),
-        );
       },
     );
   }
@@ -444,14 +327,8 @@ class _SettingsPageState extends State<SettingsPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Align(
                       alignment: Alignment.centerLeft,
-                      child: Text(
-                        tr('settings.language'),
-                        style: GoogleFonts.inter(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: theme.colorScheme.onSurface,
-                        ),
-                      ),
+                      child: Text(tr('settings.language'),
+                          style: theme.textTheme.titleMedium),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -464,7 +341,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                       title: Text(
                         lang.label,
-                        style: GoogleFonts.inter(
+                        style: theme.textTheme.bodyLarge?.copyWith(
                           fontWeight:
                               isSelected ? FontWeight.w600 : FontWeight.w400,
                           color: isSelected
@@ -491,34 +368,6 @@ class _SettingsPageState extends State<SettingsPage> {
           },
         ),
       ),
-    );
-  }
-
-  Widget _buildThemeTile(ThemeData theme) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: ThemeService.themeNotifier,
-      builder: (context, mode, _) {
-        String subtitle;
-        IconData icon;
-        switch (mode) {
-          case ThemeMode.dark:
-            subtitle = tr('appearance.dark');
-            icon = Icons.dark_mode_outlined;
-          case ThemeMode.light:
-            subtitle = tr('appearance.light');
-            icon = Icons.light_mode_outlined;
-          case ThemeMode.system:
-            subtitle = tr('appearance.system');
-            icon = Icons.contrast_outlined;
-        }
-        return _menuTile(
-          theme,
-          icon: icon,
-          title: tr('appearance.title'),
-          subtitle: subtitle,
-          onTap: () => _showThemePicker(theme),
-        );
-      },
     );
   }
 
@@ -551,14 +400,8 @@ class _SettingsPageState extends State<SettingsPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Align(
                       alignment: Alignment.centerLeft,
-                      child: Text(
-                        tr('appearance.title'),
-                        style: GoogleFonts.inter(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: theme.colorScheme.onSurface,
-                        ),
-                      ),
+                      child: Text(tr('appearance.title'),
+                          style: theme.textTheme.titleMedium),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -606,10 +449,10 @@ class _SettingsPageState extends State<SettingsPage> {
       leading: Icon(icon,
           color: isSelected
               ? theme.colorScheme.primary
-              : theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+              : theme.colorScheme.onSurfaceVariant),
       title: Text(
         label,
-        style: GoogleFonts.inter(
+        style: theme.textTheme.bodyLarge?.copyWith(
           fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
           color: isSelected
               ? theme.colorScheme.primary
@@ -623,65 +466,6 @@ class _SettingsPageState extends State<SettingsPage> {
         ThemeService.setMode(mode);
         Navigator.pop(context);
       },
-    );
-  }
-
-  Widget _sectionLabel(ThemeData theme, String text) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-      child: Text(
-        text,
-        style: GoogleFonts.inter(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
-          letterSpacing: 0.8,
-        ),
-      ),
-    );
-  }
-
-  Widget _menuTile(
-    ThemeData theme, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-    Widget? trailing,
-  }) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-      leading: Container(
-        width: 38,
-        height: 38,
-        decoration: BoxDecoration(
-          color: theme.colorScheme.onSurface.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, size: 20,
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
-      ),
-      title: Text(
-        title,
-        style: GoogleFonts.inter(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-          color: theme.colorScheme.onSurface,
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: GoogleFonts.inter(
-          fontSize: 12,
-          color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      trailing: trailing ?? Icon(Icons.chevron_right_rounded,
-          size: 20,
-          color: theme.colorScheme.onSurface.withValues(alpha: 0.25)),
-      onTap: onTap,
     );
   }
 }
