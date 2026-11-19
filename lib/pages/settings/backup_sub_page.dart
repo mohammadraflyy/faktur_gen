@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../main.dart';
 import '../../services/backup_service.dart';
 import '../../services/locale_service.dart';
@@ -43,8 +42,7 @@ class BackupSubPage extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             tr('settings.backup_note'),
-            style: TextStyle(
-                fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+            style: theme.textTheme.bodySmall,
           ),
         ],
       ),
@@ -63,7 +61,9 @@ class BackupSubPage extends StatelessWidget {
               child: Text(tr('common.cancel'))),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(tr('settings.import'), style: const TextStyle(color: Colors.orange)),
+            child: Text(tr('settings.import'),
+                style: TextStyle(
+                    color: AppColors.warningFor(Theme.of(ctx).brightness))),
           ),
         ],
       ),
@@ -142,15 +142,9 @@ class _BackupTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title,
-                        style: GoogleFonts.inter(
-                            fontSize: 14, fontWeight: FontWeight.w600)),
+                    Text(title, style: theme.textTheme.titleSmall),
                     const SizedBox(height: 2),
-                    Text(subtitle,
-                        style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: theme.colorScheme.onSurface
-                                .withValues(alpha: 0.5))),
+                    Text(subtitle, style: theme.textTheme.bodySmall),
                   ],
                 ),
               ),

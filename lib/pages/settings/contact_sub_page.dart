@@ -45,9 +45,9 @@ class _ContactSubPageState extends State<ContactSubPage>
         children: [
           buildField(controller: _teleponCtrl, label: tr('settings.phone'), keyboardType: TextInputType.phone),
           const SizedBox(height: 14),
-          buildField(controller: _emailCtrl, label: 'Email', keyboardType: TextInputType.emailAddress),
+          buildField(controller: _emailCtrl, label: tr('settings.email'), keyboardType: TextInputType.emailAddress),
           const SizedBox(height: 14),
-          buildField(controller: _websiteCtrl, label: 'Website', hint: 'cth: www.tokosaya.com', keyboardType: TextInputType.url),
+          buildField(controller: _websiteCtrl, label: tr('settings.website'), hint: tr('settings.website_hint'), keyboardType: TextInputType.url),
           const SizedBox(height: 32),
           buildSaveButton(theme, () {
             _s

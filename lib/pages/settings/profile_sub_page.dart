@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../main.dart';
 import '../../models/settings_model.dart';
 import '../../services/locale_service.dart';
 import 'settings_sub_page_mixin.dart';
@@ -60,9 +61,11 @@ class _ProfileSubPageState extends State<ProfileSubPage>
             ),
             if (_s.hasLogo)
               ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                leading: Icon(Icons.delete_outline,
+                    color: AppColors.errorFor(Theme.of(context).brightness)),
                 title: Text(tr('settings.delete_logo'),
-                    style: const TextStyle(color: Colors.red)),
+                    style: TextStyle(
+                        color: AppColors.errorFor(Theme.of(context).brightness))),
                 onTap: () {
                   setState(() => _s.logoBytes = null);
                   Navigator.pop(context);
@@ -126,7 +129,7 @@ class _ProfileSubPageState extends State<ProfileSubPage>
                           color: theme.colorScheme.primary,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.edit, color: Colors.white, size: 12),
+                        child: Icon(Icons.edit, color: theme.colorScheme.onPrimary, size: 12),
                       ),
                     ),
                   ],
@@ -136,7 +139,7 @@ class _ProfileSubPageState extends State<ProfileSubPage>
             const SizedBox(height: 24),
             buildField(controller: _namaCtrl, label: tr('settings.store_name'), required: true),
             const SizedBox(height: 14),
-            buildField(controller: _npwpCtrl, label: 'NPWP', hint: 'cth: 00.000.000.0-000.000', keyboardType: TextInputType.number),
+            buildField(controller: _npwpCtrl, label: tr('settings.npwp'), hint: tr('settings.npwp_hint'), keyboardType: TextInputType.number),
             const SizedBox(height: 14),
             buildField(controller: _alamatCtrl, label: tr('settings.address'), maxLines: 3),
             const SizedBox(height: 32),

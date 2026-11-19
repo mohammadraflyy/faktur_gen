@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../services/locale_service.dart';
 import '../../services/updater_service.dart';
 
@@ -31,30 +30,20 @@ class AboutSubPage extends StatelessWidget {
           Text(
             'Faktura',
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              color: theme.colorScheme.onSurface,
-            ),
+            style: theme.textTheme.headlineSmall,
           ),
           const SizedBox(height: 4),
           Text(
             tr('about.subtitle'),
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-            ),
+            style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: 6),
           Text(
             tr('about.version')
                 .replaceAll('{version}', UpdaterService.currentAppVersion),
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
-            ),
+            style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: 32),
           _infoTile(theme,
@@ -77,10 +66,7 @@ class AboutSubPage extends StatelessWidget {
           Text(
             tr('about.made_with'),
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
-            ),
+            style: theme.textTheme.bodySmall,
           ),
         ],
       ),
@@ -115,21 +101,12 @@ class AboutSubPage extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: theme.colorScheme.onSurface,
-                  ),
+                  style: theme.textTheme.titleSmall,
                 ),
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: theme.colorScheme.onSurface
-                        .withValues(alpha: 0.5),
-                    height: 1.4,
-                  ),
+                  style: theme.textTheme.bodySmall,
                 ),
               ],
             ),

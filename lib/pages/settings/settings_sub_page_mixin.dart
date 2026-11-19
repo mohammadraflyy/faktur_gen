@@ -37,7 +37,9 @@ mixin SettingsSubPageMixin<T extends StatefulWidget> on State<T> {
       maxLines: maxLines,
       keyboardType: keyboardType,
       validator: required
-          ? (v) => (v == null || v.isEmpty) ? '$label wajib diisi' : null
+          ? (v) => (v == null || v.isEmpty)
+              ? tr('settings.required').replaceAll('{label}', label)
+              : null
           : null,
     );
   }

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../models/settings_model.dart';
 import '../../services/locale_service.dart';
 import '../../services/settings_service.dart';
@@ -56,11 +55,7 @@ class _QrisSubPageState extends State<QrisSubPage> {
         children: [
           Text(
             tr('settings.qris_desc'),
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-              height: 1.5,
-            ),
+            style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: 20),
           TextFormField(

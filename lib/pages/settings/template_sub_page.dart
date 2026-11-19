@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../models/doc_template_config.dart';
 import '../../models/settings_model.dart';
 import '../../services/locale_service.dart';
@@ -36,12 +35,7 @@ class _TemplateSubPageState extends State<TemplateSubPage>
           // Invoice template
           Text(
             tr('template.invoice_design'),
-            style: GoogleFonts.inter(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
-              letterSpacing: 0.8,
-            ),
+            style: theme.textTheme.titleMedium,
           ),
           const SizedBox(height: 12),
           ...InvoiceTemplate.values.map((t) => _templateOption(
@@ -57,12 +51,7 @@ class _TemplateSubPageState extends State<TemplateSubPage>
           // Struk template
           Text(
             tr('template.receipt_design'),
-            style: GoogleFonts.inter(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
-              letterSpacing: 0.8,
-            ),
+            style: theme.textTheme.titleMedium,
           ),
           const SizedBox(height: 12),
           ...StrukTemplate.values.map((t) => _templateOption(
@@ -78,12 +67,7 @@ class _TemplateSubPageState extends State<TemplateSubPage>
           // Customization toggles
           Text(
             tr('template.customize'),
-            style: GoogleFonts.inter(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
-              letterSpacing: 0.8,
-            ),
+            style: theme.textTheme.titleMedium,
           ),
           const SizedBox(height: 12),
           _toggleTile(theme,
@@ -126,17 +110,10 @@ class _TemplateSubPageState extends State<TemplateSubPage>
           // Color picker
           Text(
             tr('template.primary_color'),
-            style: GoogleFonts.inter(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
-              letterSpacing: 0.8,
-            ),
+            style: theme.textTheme.titleMedium,
           ),
           const SizedBox(height: 12),
           Wrap(
-            spacing: 10,
-            runSpacing: 10,
             children: [
               0xFF2563EB, // Blue
               0xFF059669, // Green
@@ -210,23 +187,9 @@ class _TemplateSubPageState extends State<TemplateSubPage>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    label,
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
+                  Text(label, style: theme.textTheme.titleSmall),
                   const SizedBox(height: 2),
-                  Text(
-                    description,
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: theme.colorScheme.onSurface
-                          .withValues(alpha: 0.45),
-                    ),
-                  ),
+                  Text(description, style: theme.textTheme.bodySmall),
                 ],
               ),
             ),
@@ -249,13 +212,9 @@ class _TemplateSubPageState extends State<TemplateSubPage>
       secondary: Icon(icon,
           size: 20,
           color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
-      title: Text(title,
-          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500)),
+      title: Text(title, style: theme.textTheme.bodyLarge),
       subtitle: subtitle != null
-          ? Text(subtitle,
-              style: GoogleFonts.inter(
-                  fontSize: 12,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.4)))
+          ? Text(subtitle, style: theme.textTheme.bodySmall)
           : null,
       value: value,
       onChanged: onChanged,
@@ -264,34 +223,39 @@ class _TemplateSubPageState extends State<TemplateSubPage>
 
   Widget _colorDot(ThemeData theme, int colorValue) {
     final isSelected = _config.primaryColorValue == colorValue;
+    // 36dp dot plus 6dp padding on each side = 48dp tap target.
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () => setState(() => _config.primaryColorValue = colorValue),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: Color(colorValue),
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: isSelected
-                ? theme.colorScheme.onSurface
-                : Colors.transparent,
-            width: 2.5,
+      child: Padding(
+        padding: const EdgeInsets.all(6),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: Color(colorValue),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: isSelected
+                  ? theme.colorScheme.onSurface
+                  : Colors.transparent,
+              width: 2.5,
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: Color(colorValue).withValues(alpha: 0.4),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
           ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: Color(colorValue).withValues(alpha: 0.4),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
+          child: isSelected
+              ? const Icon(Icons.check, size: 16, color: Colors.white)
               : null,
         ),
-        child: isSelected
-            ? const Icon(Icons.check, size: 16, color: Colors.white)
-            : null,
       ),
     );
   }

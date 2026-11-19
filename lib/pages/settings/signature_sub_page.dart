@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import '../../main.dart';
 import '../../models/settings_model.dart';
 import '../../services/locale_service.dart';
 import '../../widgets/signature_pad.dart';
@@ -40,7 +41,9 @@ class _SignatureSubPageState extends State<SignatureSubPage>
         actions: [
           if (_s.hasSignature)
             IconButton(
-              icon: const Icon(Icons.delete_outline, color: Colors.red),
+              tooltip: tr('common.delete'),
+              icon: Icon(Icons.delete_outline,
+                  color: AppColors.errorFor(theme.brightness)),
               onPressed: () => setState(() => _s.signatureBytes = null),
             ),
         ],
@@ -72,9 +75,7 @@ class _SignatureSubPageState extends State<SignatureSubPage>
                             color: theme.colorScheme.onSurfaceVariant),
                         const SizedBox(height: 8),
                         Text(tr('settings.sign_tap'),
-                            style: TextStyle(
-                                fontSize: 13,
-                                color: theme.colorScheme.onSurfaceVariant)),
+                            style: theme.textTheme.bodySmall),
                       ],
                     ),
             ),
@@ -82,8 +83,7 @@ class _SignatureSubPageState extends State<SignatureSubPage>
           const SizedBox(height: 10),
           Text(
             tr('settings.sign_note'),
-            style: TextStyle(
-                fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+            style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: 32),
           buildSaveButton(theme, () => saveSettings(_s)),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../main.dart';
 import '../../models/settings_model.dart';
 import '../../services/locale_service.dart';
 import 'settings_sub_page_mixin.dart';
@@ -70,11 +71,14 @@ class _BankSubPageState extends State<BankSubPage>
                   Row(
                     children: [
                       Text('${tr('settings.account_n')} ${i + 1}',
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                          style: theme.textTheme.titleSmall),
                       const Spacer(),
                       if (_bankCtrls.length > 1)
                         IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                          tooltip: tr('common.delete'),
+                          icon: Icon(Icons.delete_outline,
+                              color: AppColors.errorFor(theme.brightness),
+                              size: 20),
                           onPressed: () => setState(() {
                             c.dispose();
                             _bankCtrls.removeAt(i);
@@ -85,7 +89,7 @@ class _BankSubPageState extends State<BankSubPage>
                     ],
                   ),
                   const SizedBox(height: 10),
-                  buildField(controller: c.bankCtrl, label: tr('settings.bank_name'), hint: 'cth: BCA, Mandiri'),
+                  buildField(controller: c.bankCtrl, label: tr('settings.bank_name'), hint: tr('settings.bank_hint')),
                   const SizedBox(height: 10),
                   buildField(controller: c.nomorCtrl, label: tr('settings.account_number'), keyboardType: TextInputType.number),
                   const SizedBox(height: 10),

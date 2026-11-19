@@ -39,8 +39,8 @@ class _StrukSubPageState extends State<StrukSubPage>
         children: [
           buildField(
             controller: _footerCtrl,
-            label: 'Pesan Footer Struk',
-            hint: 'cth: Terima kasih atas kunjungan Anda!',
+            label: tr('settings.footer_receipt'),
+            hint: tr('settings.footer_hint'),
             maxLines: 3,
           ),
           const SizedBox(height: 32),

@@ -259,10 +259,10 @@ const _strings = <String, List<String>>{
 
   // ─── Template ────────────────────────────────────────────────────────────
   'template.title': ['Template Dokumen', 'Document Templates'],
-  'template.invoice_design': ['DESAIN INVOICE', 'INVOICE DESIGN'],
-  'template.receipt_design': ['DESAIN STRUK', 'RECEIPT DESIGN'],
-  'template.customize': ['KUSTOMISASI', 'CUSTOMIZATION'],
-  'template.primary_color': ['WARNA UTAMA', 'PRIMARY COLOR'],
+  'template.invoice_design': ['Desain invoice', 'Invoice design'],
+  'template.receipt_design': ['Desain struk', 'Receipt design'],
+  'template.customize': ['Kustomisasi', 'Customization'],
+  'template.primary_color': ['Warna utama', 'Primary color'],
   'template.show_logo': ['Tampilkan Logo', 'Show Logo'],
   'template.logo_center': ['Logo di Tengah', 'Center Logo'],
   'template.logo_center_off': ['Off = logo di kiri', 'Off = logo on left'],
@@ -551,4 +551,9 @@ const _strings = <String, List<String>>{
   'receipt.date': ['Tanggal & waktu', 'Date & time'],
   'receipt.make': ['Buat struk', 'Create receipt'],
   'receipt.preview_title': ['Preview Struk', 'Receipt Preview'],
+  'settings.required': ['{label} wajib diisi', '{label} is required'],
+  'settings.npwp_hint': ['cth: 00.000.000.0-000.000', 'e.g. 00.000.000.0-000.000'],
+  'settings.website_hint': ['cth: www.tokosaya.com', 'e.g. www.mystore.com'],
+  'settings.footer_hint': ['cth: Terima kasih atas kunjungan Anda!', 'e.g. Thank you for visiting!'],
+  'settings.bank_hint': ['cth: BCA, Mandiri', 'e.g. BCA, Mandiri'],
 };

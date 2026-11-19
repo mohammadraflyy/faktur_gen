@@ -49,7 +49,7 @@ class _InvoiceSettingsSubPageState extends State<InvoiceSettingsSubPage>
               Expanded(
                 child: buildField(
                   controller: _taxRateCtrl,
-                  label: 'Tarif Pajak (%)',
+                  label: tr('settings.tax_rate'),
                   hint: '11',
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 ),
@@ -58,7 +58,7 @@ class _InvoiceSettingsSubPageState extends State<InvoiceSettingsSubPage>
               Expanded(
                 child: DropdownButtonFormField<String>(
                   initialValue: _s.currency,
-                  decoration: const InputDecoration(labelText: 'Mata Uang'),
+                  decoration: InputDecoration(labelText: tr('settings.currency')),
                   items: const [
                     DropdownMenuItem(value: 'IDR', child: Text('IDR (Rp)')),
                     DropdownMenuItem(value: 'USD', child: Text('USD (\$)')),
@@ -74,9 +74,9 @@ class _InvoiceSettingsSubPageState extends State<InvoiceSettingsSubPage>
           const SizedBox(height: 14),
           Row(
             children: [
-              Expanded(child: buildField(controller: _invPrefixCtrl, label: 'Prefix Invoice', hint: 'INV')),
+              Expanded(child: buildField(controller: _invPrefixCtrl, label: tr('settings.prefix_invoice'), hint: 'INV')),
               const SizedBox(width: 12),
-              Expanded(child: buildField(controller: _strPrefixCtrl, label: 'Prefix Struk', hint: 'STR')),
+              Expanded(child: buildField(controller: _strPrefixCtrl, label: tr('settings.prefix_receipt'), hint: 'STR')),
             ],
           ),
           const SizedBox(height: 32),
