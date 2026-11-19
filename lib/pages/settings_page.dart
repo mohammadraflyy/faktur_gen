@@ -685,3 +685,90 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 }
+
+/// Top of Pengaturan: store avatar and name, plan, monthly quota as a thin
+/// bar, and the Pro link for free users.
+class SettingsHeader extends StatelessWidget {
+  final SettingsModel settings;
+  final SubscriptionModel sub;
+  final VoidCallback onUpgrade;
+
+  const SettingsHeader({
+    super.key,
+    required this.settings,
+    required this.sub,
+    required this.onUpgrade,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    const limit = SubscriptionService.freeMonthlyLimit;
+    final used = sub.monthlyDocCount;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 8, 0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: theme.colorScheme.primary.withValues(alpha: 0.08),
+              image: settings.hasLogo
+                  ? DecorationImage(
+                      image: MemoryImage(settings.logoBytes!),
+                      fit: BoxFit.contain,
+                    )
+                  : null,
+            ),
+            child: settings.hasLogo
+                ? null
+                : Icon(Icons.storefront_outlined,
+                    color: theme.colorScheme.primary),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  settings.namaToko.isNotEmpty ? settings.namaToko : 'Faktura',
+                  style: theme.textTheme.titleSmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  sub.isPro
+                      ? tr('settings.plan_pro')
+                      : tr('settings.plan_free')
+                          .replaceAll('{n}', '$used')
+                          .replaceAll('{max}', '$limit'),
+                  style: theme.textTheme.bodySmall,
+                ),
+                if (!sub.isPro) ...[
+                  const SizedBox(height: 8),
+                  LinearProgressIndicator(
+                    // The count can pass the limit; the bar just stays full.
+                    value: used >= limit ? 1 : used / limit,
+                    minHeight: 4,
+                    borderRadius: BorderRadius.circular(2),
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (!sub.isPro)
+            TextButton(
+              onPressed: onUpgrade,
+              // "Pro" alone says little to TalkBack.
+              child: Text('Pro', semanticsLabel: tr('sub.unlock_all')),
+            ),
+        ],
+      ),
+    );
+  }
+}

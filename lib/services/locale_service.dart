@@ -557,4 +557,6 @@ const _strings = <String, List<String>>{
   'settings.footer_hint': ['cth: Terima kasih atas kunjungan Anda!', 'e.g. Thank you for visiting!'],
   'settings.bank_hint': ['cth: BCA, Mandiri', 'e.g. BCA, Mandiri'],
   'settings.add_account': ['Tambah rekening', 'Add account'],
+  'settings.plan_free': ['Gratis · {n} dari {max} dokumen bulan ini', 'Free · {n} of {max} documents this month'],
+  'settings.plan_pro': ['Pro · dokumen tak terbatas', 'Pro · unlimited documents'],
 };
