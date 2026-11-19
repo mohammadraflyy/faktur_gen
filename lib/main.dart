@@ -323,7 +323,7 @@ class MyApp extends StatelessWidget {
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       labelStyle: GoogleFonts.inter(
         fontSize: 13,
-        color: dark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+        color: dark ? const Color(0xFF9CA3AF) : const Color(0xFF4B5563),
       ),
       // #6B7280 on #F3F4F6 is 4.39:1, below AA.
       hintStyle: GoogleFonts.inter(

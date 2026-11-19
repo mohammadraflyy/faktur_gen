@@ -58,6 +58,10 @@ void main() {
       const Color(0xFF4B5563),
     );
     expect(
+      theme.inputDecorationTheme.labelStyle!.color,
+      const Color(0xFF4B5563),
+    );
+    expect(
       (theme.inputDecorationTheme.enabledBorder as OutlineInputBorder)
           .borderSide,
       BorderSide.none,
