@@ -10,7 +10,7 @@ final _fmt =
 /// Opens the sheet on a phone-sized screen; the returned function reads
 /// the result once the sheet has closed.
 Future<ItemEditResult? Function()> _open(WidgetTester tester, ItemFaktur item,
-    {bool isNew = false}) async {
+    {bool isNew = false, double? discount}) async {
   tester.view.physicalSize = const Size(1080, 2400);
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
@@ -23,7 +23,7 @@ Future<ItemEditResult? Function()> _open(WidgetTester tester, ItemFaktur item,
           child: TextButton(
             onPressed: () async {
               result = await showItemEditSheet(context,
-                  item: item, currency: _fmt, isNew: isNew);
+                  item: item, currency: _fmt, isNew: isNew, discount: discount);
             },
             child: const Text('open'),
           ),
@@ -103,5 +103,27 @@ void main() {
   testWidgets('new items have no delete button', (tester) async {
     await _open(tester, ItemFaktur(), isNew: true);
     expect(find.text('Hapus item'), findsNothing);
+  });
+
+  testWidgets('no discount field unless the caller asks for one',
+      (tester) async {
+    await _open(tester, ItemFaktur(namaBarang: 'A', hargaSatuan: 10));
+    expect(find.text('Diskon item'), findsNothing);
+  });
+
+  testWidgets('discount lowers the subtotal and is returned', (tester) async {
+    final read = await _open(
+        tester, ItemFaktur(namaBarang: 'Kopi', hargaSatuan: 25000),
+        discount: 0);
+
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Diskon item'), '5000');
+    await tester.pump();
+    await tester.tap(find.text('Simpan · Rp 20,000'));
+    await tester.pumpAndSettle();
+
+    final result = read();
+    expect(result!.discount, 5000);
+    expect(result.item!.hargaSatuan, 25000);
   });
 }

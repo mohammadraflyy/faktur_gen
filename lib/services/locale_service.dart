@@ -523,4 +523,5 @@ const _strings = <String, List<String>>{
   'invoice.catalog_new': ['Baru', 'New'],
   'invoice.search_item': ['Cari item...', 'Search items...'],
   'invoice.catalog_empty': ['Katalog kosong. Tap "Baru" untuk menambah.', 'Catalog is empty. Tap "New" to add one.'],
+  'item.discount': ['Diskon item', 'Item discount'],
 };

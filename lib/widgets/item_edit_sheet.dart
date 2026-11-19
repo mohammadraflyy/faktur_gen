@@ -8,8 +8,13 @@ import '../services/locale_service.dart';
 /// Outcome of the item sheet: an edited item, or a delete request.
 class ItemEditResult {
   final ItemFaktur? item;
-  const ItemEditResult.saved(ItemFaktur this.item);
-  const ItemEditResult.deleted() : item = null;
+
+  /// Per-item discount; stays 0 unless the sheet was opened with one.
+  final double discount;
+  const ItemEditResult.saved(ItemFaktur this.item, {this.discount = 0});
+  const ItemEditResult.deleted()
+      : item = null,
+        discount = 0;
 
   bool get deleted => item == null;
 }
@@ -19,13 +24,14 @@ Future<ItemEditResult?> showItemEditSheet(
   required ItemFaktur item,
   required NumberFormat currency,
   bool isNew = false,
+  double? discount,
 }) {
   return showModalBottomSheet<ItemEditResult>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
-    builder: (_) =>
-        ItemEditSheet(item: item, currency: currency, isNew: isNew),
+    builder: (_) => ItemEditSheet(
+        item: item, currency: currency, isNew: isNew, discount: discount),
   );
 }
 
@@ -34,11 +40,15 @@ class ItemEditSheet extends StatefulWidget {
   final NumberFormat currency;
   final bool isNew;
 
+  /// Receipts can discount a single item; null hides the field.
+  final double? discount;
+
   const ItemEditSheet({
     super.key,
     required this.item,
     required this.currency,
     this.isNew = false,
+    this.discount,
   });
 
   @override
@@ -54,12 +64,17 @@ class _ItemEditSheetState extends State<ItemEditSheet> {
       text: widget.item.hargaSatuan > 0
           ? widget.item.hargaSatuan.round().toString()
           : '');
+  late final _diskon = TextEditingController(
+      text: (widget.discount ?? 0) > 0
+          ? widget.discount!.round().toString()
+          : '');
   late double _qty = widget.item.kuantitas;
 
   static String _fmt(double v) =>
       v == v.roundToDouble() ? v.toInt().toString() : v.toString();
 
   double get _price => double.tryParse(_harga.text) ?? 0;
+  double get _discount => double.tryParse(_diskon.text) ?? 0;
 
   @override
   void dispose() {
@@ -67,6 +82,7 @@ class _ItemEditSheetState extends State<ItemEditSheet> {
     _deskripsi.dispose();
     _satuan.dispose();
     _harga.dispose();
+    _diskon.dispose();
     super.dispose();
   }
 
@@ -81,7 +97,7 @@ class _ItemEditSheetState extends State<ItemEditSheet> {
         kuantitas: _qty,
         satuan: satuan.isEmpty ? 'Unit' : satuan,
         hargaSatuan: _price,
-      )),
+      ), discount: _discount),
     );
   }
 
@@ -170,11 +186,21 @@ class _ItemEditSheetState extends State<ItemEditSheet> {
                   ),
                 ],
               ),
+              if (widget.discount != null) ...[
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _diskon,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(labelText: tr('item.discount')),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ],
               const SizedBox(height: 20),
               FilledButton(
                 onPressed: _save,
                 child: Text(
-                    '${tr('common.save')} · ${widget.currency.format(_qty * _price)}'),
+                    '${tr('common.save')} · ${widget.currency.format(_qty * _price - _discount)}'),
               ),
               if (!widget.isNew)
                 TextButton(
