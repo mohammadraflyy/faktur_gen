@@ -72,6 +72,14 @@ void main() {
     expect(find.text('Simpan · Rp 2,500'), findsOneWidget);
   });
 
+  testWidgets('dotted price is read as digits', (tester) async {
+    await _open(tester, ItemFaktur(namaBarang: 'A'), isNew: true);
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Harga satuan'), '2.500');
+    await tester.pump();
+    expect(find.text('Simpan · Rp 2,500'), findsOneWidget);
+  });
+
   testWidgets('empty name blocks save', (tester) async {
     final read = await _open(tester, ItemFaktur(), isNew: true);
     await tester.tap(find.text('Simpan · Rp 0'));

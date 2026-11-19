@@ -57,7 +57,7 @@ class _ItemEditSheetState extends State<ItemEditSheet> {
   static String _fmt(double v) =>
       v == v.roundToDouble() ? v.toInt().toString() : v.toString();
 
-  double get _price => double.tryParse(_harga.text.replaceAll(',', '.')) ?? 0;
+  double get _price => double.tryParse(_harga.text) ?? 0;
 
   @override
   void dispose() {
@@ -124,7 +124,7 @@ class _ItemEditSheetState extends State<ItemEditSheet> {
                     constraints:
                         const BoxConstraints(minWidth: 48, minHeight: 48),
                     onPressed:
-                        _qty > 1 ? () => setState(() => _qty -= 1) : null,
+                        _qty >= 2 ? () => setState(() => _qty -= 1) : null,
                     icon: const Icon(Icons.remove),
                   ),
                   SizedBox(
@@ -150,10 +150,9 @@ class _ItemEditSheetState extends State<ItemEditSheet> {
                     flex: 2,
                     child: TextFormField(
                       controller: _harga,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: TextInputType.number,
                       inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                        FilteringTextInputFormatter.digitsOnly,
                       ],
                       decoration: InputDecoration(labelText: tr('item.price')),
                       // Only this sheet rebuilds; the invoice page stays still.
