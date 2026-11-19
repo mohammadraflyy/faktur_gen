@@ -1,6 +1,7 @@
 package com.example.faktur_gen
 
 import android.content.Intent
+import android.os.Build
 import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -14,25 +15,13 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "faktur/native").setMethodCallHandler { call, result ->
             when (call.method) {
-                "paths" -> result.success(
-                    mapOf(
-                        "filesDir" to filesDir.absolutePath,
-                        "cacheDir" to cacheDir.absolutePath,
-                    ),
-                )
+                "supportedAbis" -> result.success(Build.SUPPORTED_ABIS.toList())
                 "installApk" -> {
                     val path = call.argument<String>("path")
-                    if (path != null) {
+                    // The FileProvider only shares cacheDir.
+                    if (path != null && File(path).canonicalFile.startsWith(cacheDir.canonicalFile)) {
                         try {
-                            var file = File(path)
-                            val inCache = file.canonicalPath.startsWith(cacheDir.canonicalPath)
-                            val inFiles = file.canonicalPath.startsWith(filesDir.canonicalPath)
-                            if (!inCache && !inFiles) {
-                                val target = File(cacheDir, file.name)
-                                file.copyTo(target, overwrite = true)
-                                file = target
-                            }
-                            val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+                            val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", File(path))
                             val intent = Intent(Intent.ACTION_VIEW).apply {
                                 setDataAndType(uri, "application/vnd.android.package-archive")
                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -44,7 +33,7 @@ class MainActivity : FlutterActivity() {
                             result.error("INSTALL_ERROR", e.localizedMessage, null)
                         }
                     } else {
-                        result.error("INVALID_PATH", "Path is null", null)
+                        result.error("INVALID_PATH", "APK must be in the app cache", null)
                     }
                 }
                 else -> result.notImplemented()
