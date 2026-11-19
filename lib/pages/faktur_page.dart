@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../main.dart';
@@ -12,13 +11,16 @@ import '../models/template_model.dart';
 import '../services/catalog_service.dart';
 import '../services/contact_service.dart';
 import '../services/history_service.dart';
+import '../services/locale_service.dart';
 import '../services/pdf_service.dart';
 import '../services/settings_service.dart';
 import '../services/subscription_service.dart';
 import '../services/reminder_service.dart';
 import '../services/template_service.dart';
 import '../models/reminder_model.dart';
+import '../widgets/item_edit_sheet.dart';
 import '../widgets/paywall_sheet.dart';
+import '../widgets/total_bar.dart';
 import 'pdf_preview_page.dart';
 
 class FakturPage extends StatefulWidget {
@@ -37,7 +39,6 @@ class FakturPage extends StatefulWidget {
 }
 
 class _FakturPageState extends State<FakturPage> {
-  final _formKey = GlobalKey<FormState>();
   final _faktur = FakturModel();
 
   final _nomorCtrl = TextEditingController();
@@ -46,7 +47,6 @@ class _FakturPageState extends State<FakturPage> {
   final _alamatPembeliCtrl = TextEditingController();
   final _teleponPembeliCtrl = TextEditingController();
   final _catatanCtrl = TextEditingController();
-  final List<_ItemCtrls> _itemCtrls = [_ItemCtrls()];
 
   SettingsModel _settings = SettingsModel();
   List<ContactModel> _contacts = [];
@@ -60,10 +60,25 @@ class _FakturPageState extends State<FakturPage> {
   bool _isLoading = true;
   bool _isDirty = false;
 
+  // Items live here, not in per-field controllers: typing happens inside
+  // the item sheet, so the page only rebuilds when an item is saved.
+  final _items = ValueNotifier<List<ItemFaktur>>([]);
+  final _total = ValueNotifier<double>(0);
+  bool _isGenerating = false;
+
+  String get _dateLocale => LocaleService.isEn ? 'en_US' : 'id_ID';
+
   @override
   void initState() {
     super.initState();
+    _items.addListener(_recalcTotal);
+    _recalcTotal();
     _loadSettings();
+  }
+
+  void _recalcTotal() {
+    _faktur.items = _items.value;
+    _total.value = _faktur.totalTagihan;
   }
 
   Future<void> _loadSettings() async {
@@ -97,7 +112,7 @@ class _FakturPageState extends State<FakturPage> {
           _catatanCtrl.text = entry.catatan;
           _faktur.catatan = entry.catatan;
           _faktur.jatuhTempo = entry.jatuhTempo;
-          _faktur.items = entry.items
+          _items.value = entry.items
               .map((i) => ItemFaktur(
                     namaBarang: i.nama,
                     kuantitas: i.kuantitas,
@@ -105,28 +120,13 @@ class _FakturPageState extends State<FakturPage> {
                     hargaSatuan: i.hargaSatuan,
                   ))
               .toList();
-          if (_faktur.items.isEmpty) _faktur.items = [ItemFaktur()];
-          for (final c in _itemCtrls) {
-            c.dispose();
-          }
-          _itemCtrls.clear();
-          for (final item in _faktur.items) {
-            final c = _ItemCtrls();
-            c.namaCtrl.text = item.namaBarang;
-            c.deskripsiCtrl.text = item.deskripsi;
-            c.qtyCtrl.text = _fmtQty(item.kuantitas);
-            c.satuanCtrl.text = item.satuan;
-            c.hargaCtrl.text =
-                item.hargaSatuan > 0 ? item.hargaSatuan.toInt().toString() : '';
-            _itemCtrls.add(c);
-          }
         } else if (widget.reminderItems != null &&
             widget.reminderItems!.isNotEmpty) {
           _nomorCtrl.text = invNum;
           if (widget.reminderContactName != null) {
             _namaPembeliCtrl.text = widget.reminderContactName!;
           }
-          _faktur.items = widget.reminderItems!
+          _items.value = widget.reminderItems!
               .map((i) => ItemFaktur(
                     namaBarang: i.nama,
                     kuantitas: i.kuantitas,
@@ -134,23 +134,11 @@ class _FakturPageState extends State<FakturPage> {
                     hargaSatuan: i.hargaSatuan,
                   ))
               .toList();
-          for (final c in _itemCtrls) {
-            c.dispose();
-          }
-          _itemCtrls.clear();
-          for (final item in _faktur.items) {
-            final c = _ItemCtrls();
-            c.namaCtrl.text = item.namaBarang;
-            c.qtyCtrl.text = _fmtQty(item.kuantitas);
-            c.satuanCtrl.text = item.satuan;
-            c.hargaCtrl.text =
-                item.hargaSatuan > 0 ? item.hargaSatuan.toInt().toString() : '';
-            _itemCtrls.add(c);
-          }
         } else {
           _nomorCtrl.text = invNum;
         }
         _isLoading = false;
+        _recalcTotal();
       });
     }
   }
@@ -198,9 +186,8 @@ class _FakturPageState extends State<FakturPage> {
     _alamatPembeliCtrl.dispose();
     _teleponPembeliCtrl.dispose();
     _catatanCtrl.dispose();
-    for (final c in _itemCtrls) {
-      c.dispose();
-    }
+    _items.dispose();
+    _total.dispose();
     super.dispose();
   }
 
@@ -233,6 +220,7 @@ class _FakturPageState extends State<FakturPage> {
     );
     if (picked != null) {
       setState(() {
+        _isDirty = true;
         if (isJatuhTempo) {
           _faktur.jatuhTempo = picked;
         } else {
@@ -242,61 +230,112 @@ class _FakturPageState extends State<FakturPage> {
     }
   }
 
-  void _addItem() {
-    setState(() {
-      _isDirty = true;
-      _faktur.items.add(ItemFaktur());
-      _itemCtrls.add(_ItemCtrls());
-    });
+  Future<void> _addItem() async {
+    final result = await showItemEditSheet(context,
+        item: ItemFaktur(), currency: _currency, isNew: true);
+    if (result == null || result.deleted) return;
+    _isDirty = true;
+    _items.value = [..._items.value, result.item!];
+  }
+
+  Future<void> _editItem(int index) async {
+    final result = await showItemEditSheet(context,
+        item: _items.value[index], currency: _currency);
+    if (result == null) return;
+    if (result.deleted) {
+      _removeItem(index);
+      return;
+    }
+    _isDirty = true;
+    _items.value = [..._items.value]..[index] = result.item!;
   }
 
   void _removeItem(int index) {
-    if (_faktur.items.length <= 1) return;
-    final removedItem = _faktur.items[index];
-    final removedCtrl = _itemCtrls[index];
-    setState(() {
-      _faktur.items.removeAt(index);
-      _itemCtrls.removeAt(index);
-    });
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Item "${removedItem.namaBarang.isNotEmpty ? removedItem.namaBarang : 'Item ${index + 1}'}" dihapus',
-        ),
+    final list = [..._items.value];
+    final removed = list.removeAt(index);
+    _isDirty = true;
+    _items.value = list;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(
+        content: Text(tr('invoice.item_removed')
+            .replaceAll('{name}', removed.namaBarang)),
+        duration: const Duration(seconds: 4),
+        persist: false,
         action: SnackBarAction(
-          label: 'Undo',
+          label: tr('common.undo'),
           onPressed: () {
-            setState(() {
-              final insertAt = index.clamp(0, _faktur.items.length);
-              _faktur.items.insert(insertAt, removedItem);
-              _itemCtrls.insert(insertAt, removedCtrl);
-            });
+            final restored = [..._items.value];
+            restored.insert(index.clamp(0, restored.length), removed);
+            _items.value = restored;
           },
         ),
-        duration: const Duration(seconds: 3),
-      ),
-    );
+      ));
+  }
+
+  void _showMessage(String text) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(text)));
   }
 
   Future<void> _generatePdf() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_isGenerating) return;
     _syncToModel();
-    if (!mounted) return;
-
-    // Check usage limit
-    final canCreate = await SubscriptionService.canCreateDocument();
-    if (!canCreate) {
-      if (mounted) showPaywallSheet(context);
+    if (_faktur.nomorFaktur.trim().isEmpty) {
+      _showMessage(tr('invoice.need_number'));
+      return;
+    }
+    if (_faktur.namaPembeli.trim().isEmpty) {
+      _showMessage(tr('invoice.need_client'));
+      _showClientSheet();
+      return;
+    }
+    if (_items.value.isEmpty) {
+      _showMessage(tr('invoice.need_item'));
       return;
     }
 
-    final faktur = _faktur;
-    final logoBytes = _settings.logoBytes;
-    final signatureBytes = _settings.signatureBytes;
-    final isPro = await SubscriptionService.isPro();
+    setState(() => _isGenerating = true);
+    final bool saved;
+    try {
+      saved = await _saveDocument();
+    } finally {
+      if (mounted) setState(() => _isGenerating = false);
+    }
+    if (!saved || !mounted) return;
 
-    // Auto-save kontak baru
+    final faktur = _faktur;
+    final isPro = await SubscriptionService.isPro();
+    if (!mounted) return;
+    final done = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PdfPreviewPage(
+          title: 'Preview Invoice',
+          filename: 'Invoice_${faktur.nomorFaktur.replaceAll('/', '-')}.pdf',
+          buildPdf: (format) => PdfService.buildBytes(faktur, format,
+              logoBytes: _settings.logoBytes,
+              signatureBytes: _settings.signatureBytes,
+              templateConfig: _settings.templateConfig,
+              showWatermark: !isPro,
+              qrisMerchantId: isPro ? _settings.qrisMerchantId : null),
+        ),
+      ),
+    );
+    if (!mounted) return;
+    await _showReminderDialog(faktur);
+    if (done == true && mounted) Navigator.pop(context);
+  }
+
+  /// Checks the quota, then stores contact and history.
+  /// False when the paywall blocked it.
+  Future<bool> _saveDocument() async {
+    if (!await SubscriptionService.canCreateDocument()) {
+      if (mounted) showPaywallSheet(context);
+      return false;
+    }
+    final faktur = _faktur;
     await ContactService.saveIfNotExists(
       nama: faktur.namaPembeli,
       npwp: faktur.npwpPembeli,
@@ -304,7 +343,6 @@ class _FakturPageState extends State<FakturPage> {
       telepon: faktur.teleponPembeli,
     );
     _reloadContacts();
-
     await HistoryService.add(HistoryEntry(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       docType: DocType.invoice,
@@ -333,30 +371,9 @@ class _FakturPageState extends State<FakturPage> {
       taxRate: faktur.taxRate,
       currency: faktur.currency,
     ));
-
-    // Track usage
     await SubscriptionService.incrementDocCount();
-
     _isDirty = false;
-    if (!mounted) return;
-    final done = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PdfPreviewPage(
-          title: 'Preview Invoice',
-          filename: 'Invoice_${faktur.nomorFaktur.replaceAll('/', '-')}.pdf',
-          buildPdf: (format) => PdfService.buildBytes(faktur, format,
-              logoBytes: logoBytes,
-              signatureBytes: signatureBytes,
-              templateConfig: _settings.templateConfig,
-              showWatermark: !isPro,
-              qrisMerchantId: isPro ? _settings.qrisMerchantId : null),
-        ),
-      ),
-    );
-    if (!mounted) return;
-    await _showReminderDialog(faktur);
-    if (done == true && mounted) Navigator.pop(context);
+    return true;
   }
 
   Future<void> _showReminderDialog(FakturModel faktur) async {
@@ -440,23 +457,16 @@ class _FakturPageState extends State<FakturPage> {
       ),
     );
     if (selected == null) return;
-    setState(() {
-      _isDirty = true;
-      _faktur.items.add(ItemFaktur(
+    _isDirty = true;
+    _items.value = [
+      ..._items.value,
+      ItemFaktur(
         namaBarang: selected.nama,
         deskripsi: selected.deskripsi,
         satuan: selected.satuan,
         hargaSatuan: selected.hargaSatuan,
-      ));
-      final c = _ItemCtrls();
-      c.namaCtrl.text = selected.nama;
-      c.deskripsiCtrl.text = selected.deskripsi;
-      c.satuanCtrl.text = selected.satuan;
-      c.hargaCtrl.text = selected.hargaSatuan > 0
-          ? selected.hargaSatuan.toInt().toString()
-          : '';
-      _itemCtrls.add(c);
-    });
+      ),
+    ];
   }
 
   Future<void> _saveAsTemplate() async {
@@ -545,32 +555,17 @@ class _FakturPageState extends State<FakturPage> {
       _teleponPembeliCtrl.text = selected.teleponPembeli;
       _catatanCtrl.text = selected.catatan;
       _faktur.catatan = selected.catatan;
-      _faktur.items = selected.items
-          .map((i) => ItemFaktur(
-                namaBarang: i.nama,
-                deskripsi: i.deskripsi,
-                kuantitas: i.kuantitas,
-                satuan: i.satuan,
-                hargaSatuan: i.hargaSatuan,
-              ))
-          .toList();
-      if (_faktur.items.isEmpty) _faktur.items = [ItemFaktur()];
-      for (final c in _itemCtrls) {
-        c.dispose();
-      }
-      _itemCtrls.clear();
-      for (final item in _faktur.items) {
-        final c = _ItemCtrls();
-        c.namaCtrl.text = item.namaBarang;
-        c.deskripsiCtrl.text = item.deskripsi;
-        c.qtyCtrl.text = _fmtQty(item.kuantitas);
-        c.satuanCtrl.text = item.satuan;
-        c.hargaCtrl.text =
-            item.hargaSatuan > 0 ? item.hargaSatuan.toInt().toString() : '';
-        _itemCtrls.add(c);
-      }
       _isDirty = true;
     });
+    _items.value = selected.items
+        .map((i) => ItemFaktur(
+              namaBarang: i.nama,
+              deskripsi: i.deskripsi,
+              kuantitas: i.kuantitas,
+              satuan: i.satuan,
+              hargaSatuan: i.hargaSatuan,
+            ))
+        .toList();
   }
 
   void _resetForm() {
@@ -585,13 +580,7 @@ class _FakturPageState extends State<FakturPage> {
       _faktur.tanggal = DateTime.now();
       _faktur.jatuhTempo = null;
       _faktur.catatan = '';
-      _faktur.items = [ItemFaktur()];
-      for (final c in _itemCtrls) {
-        c.dispose();
-      }
-      _itemCtrls
-        ..clear()
-        ..add(_ItemCtrls());
+      _items.value = [];
     });
   }
 
@@ -599,8 +588,7 @@ class _FakturPageState extends State<FakturPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final width = MediaQuery.sizeOf(context).width;
-    final isTablet = width >= 600;
-    final hPad = isTablet ? ((width - 680) / 2).clamp(24.0, 9999.0) : 16.0;
+    final hPad = width >= 600 ? ((width - 680) / 2).clamp(24.0, 9999.0) : 20.0;
 
     if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -630,7 +618,6 @@ class _FakturPageState extends State<FakturPage> {
       },
       child: Scaffold(
       appBar: AppBar(
-        title: const Text('Buat Invoice'),
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
@@ -678,543 +665,395 @@ class _FakturPageState extends State<FakturPage> {
           ),
         ],
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 24),
-          children: [
-            _buildPenjualBanner(theme),
-            const SizedBox(height: 24),
-            _buildInfoInvoice(theme),
-            const SizedBox(height: 24),
-            _buildPembeli(theme, isTablet: isTablet),
-            const SizedBox(height: 24),
-            _buildItemSection(theme),
-            const SizedBox(height: 24),
-            _buildTotalCard(theme),
-            const SizedBox(height: 24),
-            _buildCatatanCard(theme),
+      body: ListView(
+        padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 24),
+        children: [
+          _buildHeader(theme),
+          if (_settings.isEmpty) ...[
+            const SizedBox(height: 8),
+            Text(tr('invoice.store_missing'), style: theme.textTheme.bodySmall),
           ],
-        ),
+          const SizedBox(height: 24),
+          _buildClientRow(theme),
+          const Divider(height: 1),
+          _buildDueRow(theme),
+          const Divider(height: 1),
+          const SizedBox(height: 24),
+          _buildItems(theme),
+          const Divider(height: 1),
+          _buildExtrasRow(theme),
+        ],
       ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(hPad, 10, hPad, 8),
-          child: _buildGenerateButton(theme, isTablet: isTablet),
-        ),
+      bottomNavigationBar: TotalBar(
+        total: _total,
+        currency: _currency,
+        actionLabel: tr('invoice.make_pdf'),
+        busy: _isGenerating,
+        onAction: _generatePdf,
       ),
     ),
     );
   }
 
-  Widget _buildInfoInvoice(ThemeData theme) {
-    return _card(
-      theme,
-      title: 'Informasi Invoice',
-      icon: Icons.receipt_long_outlined,
-      children: [
-        _field(
-          controller: _nomorCtrl,
-          label: 'Nomor Invoice',
-          hint: 'cth: INV-001',
-          required: true,
-        ),
-        const SizedBox(height: 14),
-        Row(
-          children: [
-            Expanded(
-              child: _datePicker(
-                label: 'Tanggal Invoice',
-                date: _faktur.tanggal,
-                onTap: () => _pickDate(false),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _datePicker(
-                label: 'Jatuh Tempo',
-                date: _faktur.jatuhTempo,
-                onTap: () => _pickDate(true),
-                optional: true,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _datePicker({
-    required String label,
-    required DateTime? date,
+  Widget _row(
+    ThemeData theme, {
+    String? label,
+    required String title,
+    String? subtitle,
+    Color? titleColor,
     required VoidCallback onTap,
-    bool optional = false,
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(4),
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label,
-          suffixIcon: const Icon(Icons.calendar_today, size: 18),
-        ),
-        child: Text(
-          date != null
-              ? DateFormat('dd/MM/yyyy').format(date)
-              : optional
-                  ? 'Opsional'
-                  : '-',
-          style: TextStyle(
-            fontSize: 14,
-            color: date == null ? Colors.grey : null,
-          ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (label != null) ...[
+                    Text(label, style: theme.textTheme.bodySmall),
+                    const SizedBox(height: 4),
+                  ],
+                  Text(title,
+                      style: theme.textTheme.titleSmall
+                          ?.copyWith(color: titleColor)),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(subtitle,
+                        style: theme.textTheme.bodySmall,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis),
+                  ],
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right,
+                color: theme.colorScheme.onSurfaceVariant),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildPenjualBanner(ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: theme.dividerTheme.color ?? Colors.grey.shade200,
+  Widget _buildHeader(ThemeData theme) {
+    return InkWell(
+      onTap: _editNumber,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(tr('invoice.new_title'), style: theme.textTheme.headlineSmall),
+            const SizedBox(height: 4),
+            Text(_nomorCtrl.text, style: theme.textTheme.bodySmall),
+          ],
         ),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: _settings.hasLogo
-                  ? null
-                  : theme.colorScheme.primary.withValues(alpha: 0.07),
-              borderRadius: BorderRadius.circular(10),
-              image: _settings.hasLogo
-                  ? DecorationImage(
-                      image: MemoryImage(_settings.logoBytes!),
-                      fit: BoxFit.contain)
-                  : null,
-            ),
-            child: _settings.hasLogo
-                ? null
-                : Icon(Icons.storefront_outlined,
-                    color: theme.colorScheme.primary, size: 20),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _settings.namaToko.isEmpty
-                      ? 'Nama toko belum diisi'
-                      : _settings.namaToko,
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
-                if (_settings.alamat.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(_settings.alamat,
-                      style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.45)),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
-                ],
-              ],
-            ),
-          ),
-          Icon(Icons.lock_outline,
-              size: 14,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.2)),
+    );
+  }
+
+  Future<void> _editNumber() async {
+    var draft = _nomorCtrl.text;
+    final value = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(tr('invoice.number')),
+        content: TextFormField(
+          initialValue: draft,
+          autofocus: true,
+          onChanged: (v) => draft = v,
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(tr('common.cancel'))),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, draft.trim()),
+              child: Text(tr('common.save'))),
         ],
       ),
     );
-  }
-
-  Widget _buildPembeli(ThemeData theme, {bool isTablet = false}) {
-    return _card(
-      theme,
-      title: 'Tagihan Kepada',
-      icon: Icons.person_outline,
-      trailing: TextButton.icon(
-        onPressed: _showContactPicker,
-        icon: const Icon(Icons.contacts_outlined, size: 18),
-        label: Text(_contacts.isEmpty ? 'Kontak' : 'Pilih Kontak'),
-      ),
-      children: [
-        _field(
-          controller: _namaPembeliCtrl,
-          label: 'Nama Perusahaan / Klien',
-          required: true,
-        ),
-        const SizedBox(height: 14),
-        _field(
-          controller: _teleponPembeliCtrl,
-          label: 'No. Telepon / WhatsApp',
-          keyboardType: TextInputType.phone,
-        ),
-        const SizedBox(height: 14),
-        _field(
-          controller: _alamatPembeliCtrl,
-          label: 'Alamat',
-          maxLines: 2,
-        ),
-      ],
-    );
-  }
-
-  void _reorderItem(int oldIndex, int newIndex) {
+    if (value == null || value.isEmpty || !mounted) return;
     setState(() {
-      if (newIndex > oldIndex) newIndex--;
-      final item = _faktur.items.removeAt(oldIndex);
-      _faktur.items.insert(newIndex, item);
-      final ctrl = _itemCtrls.removeAt(oldIndex);
-      _itemCtrls.insert(newIndex, ctrl);
+      _nomorCtrl.text = value;
       _isDirty = true;
     });
   }
 
-  Widget _buildItemSection(ThemeData theme) {
-    return _card(
+  Widget _buildClientRow(ThemeData theme) {
+    final name = _namaPembeliCtrl.text.trim();
+    final details = [_teleponPembeliCtrl.text.trim(), _alamatPembeliCtrl.text.trim()]
+        .where((s) => s.isNotEmpty)
+        .join(' · ');
+    return _row(
       theme,
-      title: 'Item / Layanan',
-      icon: Icons.inventory_2_outlined,
-      trailing: TextButton.icon(
-        onPressed: _addItem,
-        icon: const Icon(Icons.add, size: 18),
-        label: const Text('Tambah Item'),
-      ),
-      children: [
-        ...List.generate(_faktur.items.length, (i) => _buildItemRow(i, theme)),
-      ],
+      label: tr('invoice.to'),
+      title: name.isEmpty ? tr('invoice.choose_client') : name,
+      titleColor: name.isEmpty ? theme.colorScheme.primary : null,
+      subtitle: details.isEmpty ? null : details,
+      onTap: _showClientSheet,
     );
   }
 
-  Widget _buildItemRow(int index, ThemeData theme) {
-    final item = _faktur.items[index];
-    final ctrls = _itemCtrls[index];
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: theme.dividerTheme.color ?? Colors.grey.shade200,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                'Item ${index + 1}',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-                ),
-              ),
-              const Spacer(),
-              if (_faktur.items.length > 1) ...[
-                if (index > 0)
-                  GestureDetector(
-                    onTap: () => _reorderItem(index, index - 1),
-                    child: Padding(
-                      padding: const EdgeInsets.all(4),
-                      child: Icon(Icons.arrow_upward_rounded,
-                          size: 16,
-                          color: theme.colorScheme.onSurface.withValues(alpha: 0.3)),
-                    ),
-                  ),
-                if (index < _faktur.items.length - 1)
-                  GestureDetector(
-                    onTap: () => _reorderItem(index, index + 2),
-                    child: Padding(
-                      padding: const EdgeInsets.all(4),
-                      child: Icon(Icons.arrow_downward_rounded,
-                          size: 16,
-                          color: theme.colorScheme.onSurface.withValues(alpha: 0.3)),
-                    ),
-                  ),
-                const SizedBox(width: 4),
-                GestureDetector(
-                  onTap: () => _removeItem(index),
-                  child: Icon(Icons.close_rounded,
-                      size: 18,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.3)),
+  Future<void> _showClientSheet() async {
+    String snapshot() =>
+        '${_namaPembeliCtrl.text}|${_teleponPembeliCtrl.text}|${_alamatPembeliCtrl.text}';
+    final before = snapshot();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(
+            20, 0, 20, 20 + MediaQuery.viewInsetsOf(ctx).bottom),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                    child: Text(tr('invoice.client'),
+                        style: Theme.of(ctx).textTheme.titleMedium)),
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _showContactPicker();
+                  },
+                  icon: const Icon(Icons.contacts_outlined, size: 18),
+                  label: Text(tr('invoice.from_contacts')),
                 ),
               ],
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: ctrls.namaCtrl,
-            decoration: const InputDecoration(labelText: 'Nama Item / Layanan'),
-            onChanged: (v) => item.namaBarang = v,
-            validator: (v) =>
-                (v == null || v.isEmpty) ? 'Wajib diisi' : null,
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: ctrls.deskripsiCtrl,
-            decoration: const InputDecoration(
-                labelText: 'Deskripsi (opsional)', hintText: 'Detail tambahan...'),
-            onChanged: (v) => item.deskripsi = v,
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: ctrls.qtyCtrl,
-                  decoration: const InputDecoration(labelText: 'Qty'),
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _namaPembeliCtrl,
+              autofocus: _namaPembeliCtrl.text.isEmpty,
+              textCapitalization: TextCapitalization.words,
+              decoration: InputDecoration(labelText: tr('invoice.client_name')),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _teleponPembeliCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: InputDecoration(labelText: tr('invoice.client_phone')),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _alamatPembeliCtrl,
+              maxLines: 2,
+              decoration:
+                  InputDecoration(labelText: tr('invoice.client_address')),
+            ),
+            const SizedBox(height: 20),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(tr('common.done'))),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+    setState(() {
+      if (snapshot() != before) _isDirty = true;
+    });
+  }
+
+  Widget _buildDueRow(ThemeData theme) {
+    final due = _faktur.jatuhTempo;
+    final days = due == null
+        ? null
+        : DateUtils.dateOnly(due)
+            .difference(DateUtils.dateOnly(_faktur.tanggal))
+            .inDays;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: () => _pickDate(true),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(tr('invoice.due'), style: theme.textTheme.bodySmall),
+                    const SizedBox(height: 4),
+                    Text(
+                      due == null
+                          ? tr('invoice.no_due')
+                          : DateFormat('d MMM yyyy', _dateLocale).format(due),
+                      style: theme.textTheme.titleSmall,
+                    ),
                   ],
-                  onChanged: (v) {
-                    setState(() {
-                      item.kuantitas = double.tryParse(v) ?? item.kuantitas;
-                    });
-                  },
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Wajib' : null,
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextFormField(
-                  controller: ctrls.satuanCtrl,
-                  decoration: const InputDecoration(labelText: 'Satuan'),
-                  onChanged: (v) => item.satuan = v,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                flex: 2,
-                child: TextFormField(
-                  controller: ctrls.hargaCtrl,
-                  decoration: InputDecoration(
-                    labelText: 'Harga Satuan',
-                    prefixText: _settings.currencySymbol,
-                  ),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  onChanged: (v) {
-                    setState(() {
-                      item.hargaSatuan = double.tryParse(v) ?? 0;
-                    });
-                  },
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Wajib' : null,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              _currency.format(item.jumlah),
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: theme.colorScheme.onSurface,
               ),
             ),
           ),
+          for (final d in const [7, 14, 30])
+            Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: ChoiceChip(
+                label: Text(tr('invoice.days_short').replaceAll('{n}', '$d')),
+                selected: days == d,
+                showCheckmark: false,
+                onSelected: (_) => setState(() {
+                  _faktur.jatuhTempo = _faktur.tanggal.add(Duration(days: d));
+                  _isDirty = true;
+                }),
+              ),
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildTotalCard(ThemeData theme) {
-    final taxLabel = 'PPN (${_faktur.taxRate % 1 == 0 ? _faktur.taxRate.toInt() : _faktur.taxRate}%)';
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.1),
-        ),
-      ),
-      child: Column(
+  Widget _buildItems(ThemeData theme) {
+    return ValueListenableBuilder<List<ItemFaktur>>(
+      valueListenable: _items,
+      builder: (context, items, _) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _totalRow('DPP', _faktur.totalDpp, theme),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: Divider(
-                height: 0.5,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.08)),
+          Text(tr('invoice.items'), style: theme.textTheme.titleMedium),
+          const SizedBox(height: 8),
+          if (items.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child:
+                  Text(tr('invoice.no_items'), style: theme.textTheme.bodySmall),
+            ),
+          for (var i = 0; i < items.length; i++) _itemRow(theme, items[i], i),
+          Wrap(
+            spacing: 8,
+            children: [
+              TextButton.icon(
+                onPressed: _addItem,
+                icon: const Icon(Icons.add, size: 18),
+                label: Text(tr('invoice.add_item')),
+              ),
+              TextButton(
+                onPressed: _openCatalog,
+                child: Text(tr('invoice.from_catalog')),
+              ),
+            ],
           ),
-          _totalRow(taxLabel, _faktur.totalPpn, theme),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: Divider(
-                height: 0.5,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.08)),
-          ),
-          _totalRow('Total', _faktur.totalTagihan, theme, bold: true),
         ],
       ),
     );
   }
 
-  Widget _buildCatatanCard(ThemeData theme) {
-    return _card(
-      theme,
-      title: 'Catatan',
-      icon: Icons.notes_outlined,
-      children: [
-        _field(
-          controller: _catatanCtrl,
-          label: 'Catatan / Syarat Pembayaran (opsional)',
-          hint: 'cth: Pembayaran via transfer ke rekening BCA 1234567890',
-          maxLines: 3,
-          onChanged: (v) => _faktur.catatan = v,
-        ),
-      ],
-    );
-  }
-
-  Widget _totalRow(String label, double value, ThemeData theme,
-      {bool bold = false}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label,
-            style: GoogleFonts.inter(
-              fontWeight: bold ? FontWeight.w600 : FontWeight.w400,
-              fontSize: bold ? 16 : 14,
-              color: bold
-                  ? theme.colorScheme.onSurface
-                  : theme.colorScheme.onSurface.withValues(alpha: 0.55),
-            )),
-        Text(_currency.format(value),
-            style: GoogleFonts.inter(
-              fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
-              fontSize: bold ? 16 : 14,
-              color: theme.colorScheme.onSurface,
-            )),
-      ],
-    );
-  }
-
-  Widget _buildGenerateButton(ThemeData theme, {bool isTablet = false}) {
-    final btn = SizedBox(
-      width: double.infinity,
-      height: 50,
-      child: ElevatedButton(
-        onPressed: _generatePdf,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: theme.colorScheme.primary,
-          foregroundColor: theme.colorScheme.onPrimary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        child: Text('Generate Invoice',
-            style: GoogleFonts.inter(
-                fontSize: 14, fontWeight: FontWeight.w600)),
+  Widget _itemRow(ThemeData theme, ItemFaktur item, int index) {
+    final isDark = theme.brightness == Brightness.dark;
+    return Dismissible(
+      key: ObjectKey(item),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        color: AppColors.errorFor(theme.brightness),
+        child: Icon(Icons.delete_outline,
+            // #0F1117 on #F87171 = 6.82:1; white on #B91C1C = 6.47:1.
+            color: isDark ? const Color(0xFF0F1117) : Colors.white,
+            semanticLabel: tr('common.delete')),
       ),
-    );
-    if (isTablet) {
-      return Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: btn,
-        ),
-      );
-    }
-    return btn;
-  }
-
-  Widget _card(
-    ThemeData theme, {
-    required String title,
-    required IconData icon,
-    required List<Widget> children,
-    Widget? trailing,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 2, bottom: 10),
+      onDismissed: (_) => _removeItem(index),
+      child: InkWell(
+        onTap: () => _editItem(index),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, size: 16,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.35)),
-              const SizedBox(width: 6),
-              Text(
-                title,
-                style: GoogleFonts.inter(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(item.namaBarang, style: theme.textTheme.bodyLarge),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${_fmtQty(item.kuantitas)} ${item.satuan} × '
+                      '${_currency.format(item.hargaSatuan)}',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
                 ),
               ),
-              if (trailing != null) ...[
-                const Spacer(),
-                trailing,
-              ],
+              const SizedBox(width: 12),
+              Text(_currency.format(item.jumlah),
+                  style: theme.textTheme.bodyLarge),
             ],
           ),
         ),
-        ...children,
-      ],
+      ),
     );
   }
 
-  Widget _field({
-    required TextEditingController controller,
-    required String label,
-    String? hint,
-    bool required = false,
-    int maxLines = 1,
-    TextInputType? keyboardType,
-    ValueChanged<String>? onChanged,
-  }) {
-    return TextFormField(
-      controller: controller,
-      decoration: InputDecoration(labelText: label, hintText: hint),
-      maxLines: maxLines,
-      keyboardType: keyboardType,
-      onChanged: onChanged,
-      validator: required
-          ? (v) => (v == null || v.isEmpty) ? '$label wajib diisi' : null
-          : null,
+  Widget _buildExtrasRow(ThemeData theme) {
+    final note = _catatanCtrl.text.trim();
+    return _row(
+      theme,
+      title: tr('invoice.extras').replaceAll('{tax}', _fmtQty(_faktur.taxRate)),
+      subtitle: note.isEmpty ? null : note,
+      onTap: _showExtrasSheet,
     );
   }
-}
 
-class _ItemCtrls {
-  final namaCtrl = TextEditingController();
-  final deskripsiCtrl = TextEditingController();
-  final qtyCtrl = TextEditingController(text: '1');
-  final satuanCtrl = TextEditingController(text: 'Unit');
-  final hargaCtrl = TextEditingController();
-
-  void dispose() {
-    namaCtrl.dispose();
-    deskripsiCtrl.dispose();
-    qtyCtrl.dispose();
-    satuanCtrl.dispose();
-    hargaCtrl.dispose();
+  Future<void> _showExtrasSheet() async {
+    final before = _catatanCtrl.text;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.fromLTRB(
+              20, 0, 20, 20 + MediaQuery.viewInsetsOf(ctx).bottom),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(tr('invoice.extras_title'),
+                  style: Theme.of(ctx).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(tr('invoice.date')),
+                trailing: Text(DateFormat('d MMM yyyy', _dateLocale)
+                    .format(_faktur.tanggal)),
+                onTap: () async {
+                  await _pickDate(false);
+                  setSheet(() {});
+                },
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(tr('invoice.tax')),
+                subtitle: Text(tr('invoice.tax_hint')),
+                trailing: Text('${_fmtQty(_faktur.taxRate)}%'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _catatanCtrl,
+                maxLines: 3,
+                decoration: InputDecoration(labelText: tr('invoice.notes')),
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(tr('common.done'))),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted) return;
+    setState(() {
+      if (_catatanCtrl.text != before) _isDirty = true;
+    });
   }
 }
 
