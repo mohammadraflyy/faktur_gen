@@ -310,10 +310,10 @@ class _FakturPageState extends State<FakturPage> {
       if (mounted) setState(() => _isGenerating = false);
     }
     if (!saved || !mounted) return;
-    _openReady(isPro);
+    await _openReady(isPro);
   }
 
-  void _openReady(bool isPro) {
+  Future<void> _openReady(bool isPro) async {
     final faktur = _faktur;
     final settings = _settings;
     final total = _currency.format(faktur.totalTagihan);
@@ -360,10 +360,11 @@ class _FakturPageState extends State<FakturPage> {
             qrisMerchantId: isPro ? settings.qrisMerchantId : null),
       ),
     );
-    // The document is already saved, so the form is replaced: back and
-    // "Selesai" both return to wherever the form was opened from.
-    Navigator.pushReplacement(
-        context, MaterialPageRoute(builder: (_) => ready));
+    // The document is already saved, so the form closes with the ready
+    // screen: back and "Selesai" both return to wherever the form was
+    // opened from, and the caller reloads only after that.
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => ready));
+    if (mounted) Navigator.pop(context);
   }
 
   /// Checks the quota, then stores contact and history.

@@ -404,7 +404,7 @@ class _StrukFormState extends State<_StrukForm> {
       if (mounted) setState(() => _isGenerating = false);
     }
     if (!saved || !mounted) return;
-    _openReady(isPro);
+    await _openReady(isPro);
   }
 
   /// Checks the quota, then stores the history entry.
@@ -447,7 +447,7 @@ class _StrukFormState extends State<_StrukForm> {
     return true;
   }
 
-  void _openReady(bool isPro) {
+  Future<void> _openReady(bool isPro) async {
     final struk = _struk;
     final settings = _settings;
     final total = _currency.format(struk.total);
@@ -493,15 +493,17 @@ class _StrukFormState extends State<_StrukForm> {
         canChangePageFormat: false,
       ),
     );
-    // Saved already: replace the form so back and "Selesai" return to the
-    // caller. The new route sits outside StrukPage, so it gets its own green.
-    Navigator.pushReplacement(
+    // Saved already: the form closes with the ready screen so back and
+    // "Selesai" return to the caller, which reloads only after that. The new
+    // route sits outside StrukPage, so it gets its own green.
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (ctx) =>
             Theme(data: _strukTheme(Theme.of(ctx)), child: ready),
       ),
     );
+    if (mounted) Navigator.pop(context);
   }
 
   void _resetForm() {
