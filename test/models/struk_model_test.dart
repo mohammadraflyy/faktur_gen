@@ -8,6 +8,7 @@ void main() {
       expect(MetodeBayar.transfer.label, 'Transfer');
       expect(MetodeBayar.debit.label, 'Kartu Debit');
       expect(MetodeBayar.kredit.label, 'Kartu Kredit');
+      expect(MetodeBayar.qris.label, 'QRIS');
     });
   });
 
@@ -131,6 +132,37 @@ void main() {
       expect(s.subtotal, 0);
       expect(s.total, 0);
       expect(s.kembalian, 0);
+    });
+  });
+
+  group('cashChange', () {
+    test('null until an amount is entered', () {
+      expect(cashChange(total: 85000, paid: 0), isNull);
+    });
+
+    test('change when paid more than the total', () {
+      expect(cashChange(total: 85000, paid: 100000), 15000);
+    });
+
+    test('zero for the exact amount', () {
+      expect(cashChange(total: 85000, paid: 85000), 0);
+    });
+
+    test('negative when the payment is short', () {
+      expect(cashChange(total: 85000, paid: 50000), -35000);
+    });
+  });
+
+  group('paymentSegment', () {
+    test('both card values highlight the card segment', () {
+      expect(paymentSegment(MetodeBayar.debit), MetodeBayar.debit);
+      expect(paymentSegment(MetodeBayar.kredit), MetodeBayar.debit);
+    });
+
+    test('other methods map to themselves', () {
+      expect(paymentSegment(MetodeBayar.tunai), MetodeBayar.tunai);
+      expect(paymentSegment(MetodeBayar.transfer), MetodeBayar.transfer);
+      expect(paymentSegment(MetodeBayar.qris), MetodeBayar.qris);
     });
   });
 }

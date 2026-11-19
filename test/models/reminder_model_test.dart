@@ -199,4 +199,27 @@ void main() {
       expect(r.docType, isNull);
     });
   });
+
+  group('defaultReminderDate', () {
+    final now = DateTime(2026, 11, 19, 10, 30);
+
+    test('due date in the future, at 09:00', () {
+      expect(defaultReminderDate(DateTime(2026, 12, 3), now),
+          DateTime(2026, 12, 3, 9));
+    });
+
+    test('no due date: 30 days from now, at 09:00', () {
+      expect(defaultReminderDate(null, now), DateTime(2026, 12, 19, 9));
+    });
+
+    test('due date already passed: 30 days from now', () {
+      expect(defaultReminderDate(DateTime(2026, 11, 1), now),
+          DateTime(2026, 12, 19, 9));
+    });
+
+    test('due today after 09:00 has passed: 30 days from now', () {
+      expect(defaultReminderDate(DateTime(2026, 11, 19), now),
+          DateTime(2026, 12, 19, 9));
+    });
+  });
 }

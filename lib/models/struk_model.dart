@@ -1,4 +1,6 @@
-enum MetodeBayar { tunai, transfer, debit, kredit }
+// The form shows one "Kartu" segment for debit and kredit; see
+// paymentSegment.
+enum MetodeBayar { tunai, transfer, debit, kredit, qris }
 
 extension MetodeBayarExt on MetodeBayar {
   String get label {
@@ -11,6 +13,8 @@ extension MetodeBayarExt on MetodeBayar {
         return 'Kartu Debit';
       case MetodeBayar.kredit:
         return 'Kartu Kredit';
+      case MetodeBayar.qris:
+        return 'QRIS';
     }
   }
 }
@@ -78,3 +82,13 @@ class StrukModel {
           ? jumlahBayar - total
           : 0;
 }
+
+/// Change for a cash payment. Negative means the customer is still short;
+/// null until an amount has been entered.
+double? cashChange({required double total, required double paid}) =>
+    paid > 0 ? paid - total : null;
+
+/// Segment highlighted in the receipt form. Debit and kredit share one
+/// "Kartu" segment whose value is debit.
+MetodeBayar paymentSegment(MetodeBayar m) =>
+    m == MetodeBayar.kredit ? MetodeBayar.debit : m;

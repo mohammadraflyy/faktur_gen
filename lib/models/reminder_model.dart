@@ -182,3 +182,13 @@ class ReminderModel {
             DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),
       );
 }
+
+/// Date for the "remind me" toggle after a document is created: the due
+/// date at 09:00, or 30 days from [now] when there is none or it has passed.
+DateTime defaultReminderDate(DateTime? due, DateTime now) {
+  if (due != null) {
+    final onDue = DateTime(due.year, due.month, due.day, 9);
+    if (onDue.isAfter(now)) return onDue;
+  }
+  return DateTime(now.year, now.month, now.day + 30, 9);
+}
